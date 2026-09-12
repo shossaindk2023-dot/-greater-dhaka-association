@@ -6,6 +6,12 @@ Website for Greater Dhaka Association, Denmark (GDA Denmark).
 - Motto: Harmony, Culture and Welfare
 - Bengali motto: সম্প্রীতি, সংস্কৃতি ও কল্যাণ
 
-## Run on Render
+## Render deployment
 
-This is a Flask application. Use `gunicorn wsgi:application` as the start command. Configure environment variables from `.env.example` and use PostgreSQL in production.
+Python 3 Flask application.
+
+Build command: `pip install -r requirements.txt`
+
+Start command: `gunicorn app:app`
+
+The repository contains `app.py`, `requirements.txt`, `render.yaml`, and `wsgi.py` on the `main` branch.
