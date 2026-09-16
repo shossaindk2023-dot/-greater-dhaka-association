@@ -3,7 +3,6 @@ from datetime import datetime
 from functools import wraps
 from flask import Flask, request, redirect, url_for, session, render_template_string, send_file, abort
 from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import generate_password_hash, check_password_hash
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A6
 import qrcode
@@ -83,47 +82,58 @@ def admin_required(fn):
     return wrapper
 
 def page(title, body, **ctx):
-    base = '''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{title}} | GDA Denmark</title><style>body{font-family:Arial,sans-serif;margin:0;background:#f6f7f9;color:#20242a}header{background:#fff;border-bottom:1px solid #ddd;padding:14px 5%;display:flex;gap:18px;align-items:center;flex-wrap:wrap}header a{text-decoration:none;color:#183b63;font-weight:600}.logo{font-size:21px;font-weight:800;margin-right:auto}.hero{background:#183b63;color:#fff;padding:55px 5%}.wrap{max-width:1050px;margin:28px auto;padding:0 18px}.card{background:#fff;padding:24px;border-radius:12px;box-shadow:0 2px 10px #00000010;margin:18px 0}input,textarea,select{width:100%;padding:11px;margin:6px 0 14px;border:1px solid #ccd2da;border-radius:7px;box-sizing:border-box}button,.btn{background:#183b63;color:#fff;border:0;border-radius:7px;padding:11px 16px;text-decoration:none;display:inline-block;cursor:pointer}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}.muted{color:#68727d}.ok{color:#176b36}.warn{color:#9b5b00}.danger{color:#a32222}table{width:100%;border-collapse:collapse;background:#fff}th,td{padding:10px;border-bottom:1px solid #e4e7eb;text-align:left}footer{text-align:center;padding:35px;color:#69727d}</style></head><body><header><div class="logo">GDA Denmark</div><a href="/">Home</a><a href="/about">About</a><a href="/committee">Committee</a><a href="/constitution">Constitution</a><a href="/news">News & Events</a><a href="/membership-fee">Membership Fee</a><a href="/register">Join</a><a href="/contact">Contact</a></header>'''+body+'''<footer>Greater Dhaka Association, Denmark · Established 2026<br>Harmony, Culture and Welfare</footer></body></html>'''
-    return render_template_string(base, title=title, **ctx)
+    description = ctx.pop('description', 'Greater Dhaka Association, Denmark (GDA Denmark) — a non-profit, non-political social, cultural and welfare association established in 2026.')
+    site_url = request.url_root.rstrip('/')
+    canonical = request.base_url
+    base = '''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="{{description}}"><meta name="robots" content="index, follow"><link rel="canonical" href="{{canonical}}"><meta property="og:type" content="website"><meta property="og:site_name" content="Greater Dhaka Association, Denmark"><meta property="og:title" content="{{title}} | GDA Denmark"><meta property="og:description" content="{{description}}"><meta property="og:url" content="{{canonical}}"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="{{title}} | GDA Denmark"><meta name="twitter:description" content="{{description}}"><script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Greater Dhaka Association, Denmark","alternateName":"GDA Denmark","url":"{{site_url}}","foundingDate":"2026","description":"A non-profit, non-political social, cultural and welfare association supporting community, culture and welfare."}</script><title>{{title}} | GDA Denmark</title><style>body{font-family:Arial,sans-serif;margin:0;background:#f6f7f9;color:#20242a}header{background:#fff;border-bottom:1px solid #ddd;padding:14px 5%;display:flex;gap:18px;align-items:center;flex-wrap:wrap}header a{text-decoration:none;color:#183b63;font-weight:600}.logo{font-size:21px;font-weight:800;margin-right:auto}.hero{background:#183b63;color:#fff;padding:55px 5%}.wrap{max-width:1050px;margin:28px auto;padding:0 18px}.card{background:#fff;padding:24px;border-radius:12px;box-shadow:0 2px 10px #00000010;margin:18px 0}input,textarea,select{width:100%;padding:11px;margin:6px 0 14px;border:1px solid #ccd2da;border-radius:7px;box-sizing:border-box}button,.btn{background:#183b63;color:#fff;border:0;border-radius:7px;padding:11px 16px;text-decoration:none;display:inline-block;cursor:pointer}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}.muted{color:#68727d}.ok{color:#176b36}.warn{color:#9b5b00}.danger{color:#a32222}table{width:100%;border-collapse:collapse;background:#fff}th,td{padding:10px;border-bottom:1px solid #e4e7eb;text-align:left}footer{text-align:center;padding:35px;color:#69727d}</style></head><body><header><div class="logo">GDA Denmark</div><a href="/">Home</a><a href="/about">About</a><a href="/committee">Committee</a><a href="/constitution">Constitution</a><a href="/news">News & Events</a><a href="/membership-fee">Membership Fee</a><a href="/register">Join</a><a href="/contact">Contact</a></header>'''+body+'''<footer>Greater Dhaka Association, Denmark · Established 2026<br>Harmony, Culture and Welfare</footer></body></html>'''
+    return render_template_string(base, title=title, description=description, canonical=canonical, site_url=site_url, **ctx)
 
 with app.app_context():
     db.create_all()
     if not Setting.query.filter_by(key='fee_amount').first():
-        set_setting('fee_amount','')
-        set_setting('bank_name','')
-        set_setting('iban','')
-        set_setting('mobilepay','')
-        set_setting('contact_email','')
-        set_setting('contact_phone','')
+        for k in ['fee_amount','bank_name','iban','mobilepay','contact_email','contact_phone']:
+            set_setting(k, '')
         db.session.commit()
+
+@app.route('/robots.txt')
+def robots():
+    site = request.url_root.rstrip('/')
+    return app.response_class(f'User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /member-card/\nSitemap: {site}/sitemap.xml\n', mimetype='text/plain')
+
+@app.route('/sitemap.xml')
+def sitemap():
+    site = request.url_root.rstrip('/')
+    paths = ['/', '/about', '/constitution', '/committee', '/news', '/membership-fee', '/register', '/status', '/contact']
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + ''.join(f'<url><loc>{site}{p}</loc></url>' for p in paths) + '</urlset>'
+    return app.response_class(xml, mimetype='application/xml')
 
 @app.route('/')
 def home():
-    return page('Home','''<section class="hero"><div class="wrap"><h1>Greater Dhaka Association, Denmark</h1><p>Harmony, Culture and Welfare</p><a class="btn" href="/register">Apply for Membership</a></div></section><div class="wrap"><div class="grid"><div class="card"><h2>Our Association</h2><p>A non-profit, non-political social and cultural association connecting people from Greater Dhaka and supporting community welfare.</p></div><div class="card"><h2>Membership</h2><p>Submit your membership application online and keep your application reference for status checking.</p><a class="btn" href="/status">Check Application</a></div><div class="card"><h2>Verification</h2><p>Approved members can be verified online using their membership number.</p></div></div></div>''')
+    return page('Home','''<section class="hero"><div class="wrap"><h1>Greater Dhaka Association, Denmark</h1><p>Harmony, Culture and Welfare</p><a class="btn" href="/register">Apply for Membership</a></div></section><div class="wrap"><div class="grid"><div class="card"><h2>Our Association</h2><p>A non-profit, non-political social and cultural association connecting people from Greater Dhaka and supporting community welfare.</p></div><div class="card"><h2>Membership</h2><p>Submit your membership application online and keep your application reference for status checking.</p><a class="btn" href="/status">Check Application</a></div><div class="card"><h2>Verification</h2><p>Approved members can be verified online using their membership number.</p></div></div></div>''', description='Greater Dhaka Association, Denmark (GDA Denmark) — connecting the Greater Dhaka community through harmony, culture and welfare.')
 
 @app.route('/about')
-def about(): return page('About','''<div class="wrap"><div class="card"><h1>About GDA Denmark</h1><p>Greater Dhaka Association, Denmark was established in 2026. The association aims to promote harmony, Bangladeshi culture and community welfare.</p><p><b>Motto:</b> Harmony, Culture and Welfare</p><p><b>বাংলা:</b> সম্প্রীতি, সংস্কৃতি ও কল্যাণ</p></div></div>''')
+def about(): return page('About','''<div class="wrap"><div class="card"><h1>About GDA Denmark</h1><p>Greater Dhaka Association, Denmark was established in 2026. The association aims to promote harmony, Bangladeshi culture and community welfare.</p><p><b>Motto:</b> Harmony, Culture and Welfare</p><p><b>বাংলা:</b> সম্প্রীতি, সংস্কৃতি ও কল্যাণ</p></div></div>''', description='Learn about Greater Dhaka Association, Denmark, established in 2026 to promote harmony, Bangladeshi culture and community welfare.')
 
 @app.route('/constitution')
-def constitution(): return page('Constitution','''<div class="wrap"><div class="card"><h1>Constitution</h1><p>The association operates as a non-profit, non-political social, cultural and welfare organisation in accordance with applicable Danish law.</p><p>Its aims include community unity, cultural activities, language and heritage, welfare support, education, sports and mutual assistance.</p></div></div>''')
+def constitution(): return page('Constitution','''<div class="wrap"><div class="card"><h1>Constitution</h1><p>The association operates as a non-profit, non-political social, cultural and welfare organisation in accordance with applicable Danish law.</p><p>Its aims include community unity, cultural activities, language and heritage, welfare support, education, sports and mutual assistance.</p></div></div>''', description='The constitution and aims of Greater Dhaka Association, Denmark, a non-profit and non-political community association.')
 
 @app.route('/committee')
 def committee():
     rows=Committee.query.order_by(Committee.sort_order, Committee.id).all()
     body='<div class="wrap"><div class="card"><h1>Committee</h1><div class="grid">'
     body += ''.join(f'<div><h3>{x.name}</h3><b>{x.position}</b><p class="muted">{x.bio}</p></div>' for x in rows) or '<p class="muted">Committee information will be published here.</p>'
-    return page('Committee',body+'</div></div></div>')
+    return page('Committee',body+'</div></div></div>', description='Committee and leadership information for Greater Dhaka Association, Denmark.')
 
 @app.route('/news')
 def news():
     rows=News.query.order_by(News.created_at.desc()).all()
     body='<div class="wrap"><div class="card"><h1>News & Events</h1>'
     body += ''.join(f'<article><h2>{x.title}</h2><p>{x.body}</p><small class="muted">{x.created_at:%d %B %Y}</small><hr></article>' for x in rows) or '<p class="muted">No announcements yet.</p>'
-    return page('News & Events',body+'</div></div>')
+    return page('News & Events',body+'</div></div>', description='News, announcements and community events from Greater Dhaka Association, Denmark.')
 
 @app.route('/membership-fee')
 def membership_fee():
-    return page('Membership Fee',f'''<div class="wrap"><div class="card"><h1>Membership Fee</h1><p><b>Fee:</b> {setting('fee_amount') or 'To be announced'}</p><p><b>Bank:</b> {setting('bank_name') or 'To be announced'}</p><p><b>IBAN:</b> {setting('iban') or 'To be announced'}</p><p><b>MobilePay:</b> {setting('mobilepay') or 'To be announced'}</p><p class="muted">After payment, keep your payment reference for the association administrator.</p></div></div>''')
+    return page('Membership Fee',f'''<div class="wrap"><div class="card"><h1>Membership Fee</h1><p><b>Fee:</b> {setting('fee_amount') or 'To be announced'}</p><p><b>Bank:</b> {setting('bank_name') or 'To be announced'}</p><p><b>IBAN:</b> {setting('iban') or 'To be announced'}</p><p><b>MobilePay:</b> {setting('mobilepay') or 'To be announced'}</p><p class="muted">After payment, keep your payment reference for the association administrator.</p></div></div>''', description='Membership fee and payment information for Greater Dhaka Association, Denmark.')
 
 @app.route('/register', methods=['GET','POST'])
 def register():
@@ -134,14 +144,14 @@ def register():
         m=Member(application_code=code,name=request.form['name'],father_name=request.form['father_name'],grandfather_name=request.form['grandfather_name'],address_bd=request.form['address_bd'],address_dk=request.form['address_dk'],nationality_birth=request.form['nationality_birth'],nationality_current=request.form['nationality_current'],date_of_birth=request.form['date_of_birth'],email=email,phone=request.form['phone'])
         db.session.add(m); db.session.commit()
         return page('Application Submitted',f'''<div class="wrap"><div class="card"><h1>Application Submitted</h1><p>Your application reference is:</p><h2>{code}</h2><p>Please save this reference to check your application status.</p><a class="btn" href="/status?code={code}">Check Status</a></div></div>''')
-    return page('Membership Application','''<div class="wrap"><div class="card"><h1>Membership Application</h1><form method="post"><label>Name</label><input name="name" required><label>Father's Name</label><input name="father_name" required><label>Grandfather's Name</label><input name="grandfather_name" required><label>Address in Bangladesh</label><textarea name="address_bd" required></textarea><label>Present Address in Denmark</label><textarea name="address_dk" required></textarea><label>Nationality by Birth</label><input name="nationality_birth" required><label>Present Nationality</label><input name="nationality_current" required><label>Date of Birth</label><input name="date_of_birth" required><label>Email</label><input type="email" name="email" required><label>Phone</label><input name="phone" required><button>Submit Application</button></form></div></div>''')
+    return page('Membership Application','''<div class="wrap"><div class="card"><h1>Membership Application</h1><form method="post"><label>Name</label><input name="name" required><label>Father's Name</label><input name="father_name" required><label>Grandfather's Name</label><input name="grandfather_name" required><label>Address in Bangladesh</label><textarea name="address_bd" required></textarea><label>Present Address in Denmark</label><textarea name="address_dk" required></textarea><label>Nationality by Birth</label><input name="nationality_birth" required><label>Present Nationality</label><input name="nationality_current" required><label>Date of Birth</label><input name="date_of_birth" required><label>Email</label><input type="email" name="email" required><label>Phone</label><input name="phone" required><button>Submit Application</button></form></div></div>''', description='Apply online for membership in Greater Dhaka Association, Denmark.')
 
 @app.route('/status')
 def status():
     code=request.args.get('code','').strip()
     result=Member.query.filter_by(application_code=code).first() if code else None
     found=f'<div class="card"><h2>{result.name}</h2><p>Status: <b>{result.status}</b></p><p>Fee: <b>{result.fee_status}</b></p><p>Application reference: {result.application_code}</p></div>' if result else ''
-    return page('Application Status',f'''<div class="wrap"><div class="card"><h1>Application Status</h1><form><input name="code" placeholder="GDA-XXXXXXXXXXXX" value="{code}" required><button>Check Status</button></form></div>{found}</div>''')
+    return page('Application Status',f'''<div class="wrap"><div class="card"><h1>Application Status</h1><form><input name="code" placeholder="GDA-XXXXXXXXXXXX" value="{code}" required><button>Check Status</button></form></div>{found}</div>''', description='Check the status of a Greater Dhaka Association, Denmark membership application.')
 
 @app.route('/verify/<membership_number>')
 def verify(membership_number):
@@ -170,7 +180,7 @@ def contact():
     if request.method=='POST':
         db.session.add(Message(name=request.form['name'],email=request.form['email'],message=request.form['message'])); db.session.commit()
         return page('Message Sent','<div class="wrap"><div class="card"><h1>Thank you</h1><p>Your message has been sent to the association.</p></div></div>')
-    return page('Contact','''<div class="wrap"><div class="card"><h1>Contact</h1><form method="post"><label>Name</label><input name="name" required><label>Email</label><input type="email" name="email" required><label>Message</label><textarea name="message" rows="6" required></textarea><button>Send Message</button></form></div></div>''')
+    return page('Contact','''<div class="wrap"><div class="card"><h1>Contact</h1><form method="post"><label>Name</label><input name="name" required><label>Email</label><input type="email" name="email" required><label>Message</label><textarea name="message" rows="6" required></textarea><button>Send Message</button></form></div></div>''', description='Contact Greater Dhaka Association, Denmark.')
 
 @app.route('/admin/login',methods=['GET','POST'])
 def admin_login():
