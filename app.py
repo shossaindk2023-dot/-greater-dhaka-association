@@ -237,6 +237,35 @@ def admin_messages():
     rows=Message.query.order_by(Message.created_at.desc()).all(); listing=''.join(f'<div class="card"><b>{x.name}</b> ({x.email})<p>{x.message}</p><small>{x.created_at:%d %B %Y %H:%M}</small></div>' for x in rows) or '<p>No messages.</p>'
     return page('Messages','<div class="wrap"><h1>Contact Messages</h1>'+listing+'</div>')
 
+@app.route('/google827a650554bab237.html')
+def google_site_verification():
+    return 'google-site-verification: google827a650554bab237.html', 200, {'Content-Type': 'text/plain; charset=utf-8'}
+
+@app.route('/admin/manage')
+@admin_required
+def admin_manage():
+    members=Member.query.order_by(Member.created_at.desc()).all()
+    rows=[]
+    for m in members:
+        actions=[]
+        if m.status != 'Approved':
+            actions.append(f'<a href="/admin/approve/{m.id}">Approve</a>')
+        if m.fee_status != 'Paid':
+            actions.append(f'<a href="/admin/member/{m.id}/fee-paid">Mark fee paid</a>')
+        if m.membership_number:
+            actions.append(f'<a href="/member-card/{m.membership_number}.pdf">Member card PDF</a>')
+        rows.append(f'<tr><td>{m.name}</td><td>{m.application_code}</td><td>{m.status}</td><td>{m.fee_status}</td><td>{" | ".join(actions) or "—"}</td></tr>')
+    table=''.join(rows) or '<tr><td colspan="5">No applications yet.</td></tr>'
+    return page('Member Management',f'''<div class="wrap"><div class="card"><h1>GDA Member Management</h1><p><a href="/admin">← Admin Dashboard</a> · <a href="/admin/logout">Logout</a></p><table><tr><th>Name</th><th>Application</th><th>Status</th><th>Fee</th><th>Actions</th></tr>{table}</table></div></div>''')
+
+@app.route('/admin/member/<int:member_id>/fee-paid')
+@admin_required
+def mark_fee_paid(member_id):
+    m=Member.query.get_or_404(member_id)
+    m.fee_status='Paid'
+    db.session.commit()
+    return redirect(url_for('admin_manage'))
+
 @app.route('/health')
 def health(): return {'status':'ok'}
 
