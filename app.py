@@ -240,6 +240,27 @@ def admin_dashboard():
     rows=''.join(f'<tr><td>{m.name}</td><td>{m.application_code}</td><td>{m.status}</td><td>{m.fee_status}</td><td>{("<a href=/admin/approve/"+str(m.id)+">Approve</a>") if m.status=="Pending" else ""}</td></tr>' for m in members)
     return page('Admin Dashboard',f'''<div class="wrap"><div class="card"><h1>Admin Dashboard</h1><p><a href="/admin/settings">Website Settings</a> · <a href="/admin/news">News</a> · <a href="/admin/committee">Committee</a> · <a href="/admin/messages">Messages</a> · <a href="/admin/logout">Logout</a></p></div><div class="card"><h2>Members</h2><table><tr><th>Name</th><th>Application</th><th>Status</th><th>Fee</th><th>Action</th></tr>{rows}</table></div></div>''')
 
+@app.route('/admin/change-password',methods=['GET','POST'])
+@admin_required
+def admin_change_password():
+    admin=current_admin()
+    if not admin:
+        return redirect(url_for('admin_login'))
+    if request.method=='POST':
+        current=request.form.get('current_password','')
+        new_password=request.form.get('new_password','')
+        confirm=request.form.get('confirm_password','')
+        if not check_password_hash(admin.password_hash,current):
+            return page('Change Password','<div class="wrap"><div class="card"><p class="danger">Current password is incorrect.</p></div></div>')
+        if len(new_password) < 8:
+            return page('Change Password','<div class="wrap"><div class="card"><p class="danger">New password must be at least 8 characters.</p></div></div>')
+        if new_password != confirm:
+            return page('Change Password','<div class="wrap"><div class="card"><p class="danger">New passwords do not match.</p></div></div>')
+        admin.password_hash=generate_password_hash(new_password)
+        db.session.commit()
+        return page('Password Changed','<div class="wrap"><div class="card"><h1>Password Changed</h1><p>Your password has been updated successfully.</p><p><a href="/admin">Back to Admin Dashboard</a></p></div></div>')
+    return page('Change Password','''<div class="wrap"><div class="card"><h1>Change Password</h1><form method="post"><label>Current Password</label><input type="password" name="current_password" required><label>New Password</label><input type="password" name="new_password" minlength="8" required><label>Confirm New Password</label><input type="password" name="confirm_password" minlength="8" required><button>Change Password</button></form></div></div>''')
+
 @app.route('/admin/users',methods=['GET','POST'])
 @superadmin_required
 def admin_users():
