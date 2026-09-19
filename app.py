@@ -352,9 +352,9 @@ def admin_manage():
             actions.append(f'<a href="/admin/member/{m.id}/fee-paid">Mark fee paid</a>')
         if m.membership_number:
             actions.append(f'<a href="/member-card/{m.membership_number}.pdf">Member card PDF</a>')
-        rows.append(f'<tr><td>{m.name}</td><td>{m.application_code}</td><td>{m.status}</td><td>{m.fee_status}</td><td>{" | ".join(actions) or "—"}</td></tr>')
+        rows.append(f'<tr><td>{m.name}</td><td>{m.application_code}</td><td>{m.status}</td><td>{m.fee_status}</td><td>{" | ".join(actions) or "-"}</td></tr>')
     table=''.join(rows) or '<tr><td colspan="5">No applications yet.</td></tr>'
-    return page('Member Management',f'''<div class="wrap"><div class="card"><h1>GDA Member Management</h1><p><a href="/admin">← Admin Dashboard</a> · <a href="/admin/logout">Logout</a></p><table><tr><th>Name</th><th>Application</th><th>Status</th><th>Fee</th><th>Actions</th></tr>{table}</table></div></div>''')
+    return page('Member Management',f'''<div class="wrap"><div class="card"><h1>GDA Member Management</h1><p><a href="/admin">Admin Dashboard</a> · <a href="/admin/logout">Logout</a></p><table><tr><th>Name</th><th>Application</th><th>Status</th><th>Fee</th><th>Actions</th></tr>{table}</table></div></div>''')
 
 @app.route('/admin/member/<int:member_id>/fee-paid')
 @admin_required
