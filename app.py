@@ -228,7 +228,8 @@ def admin_login():
             session['admin_role']=admin.role
             return redirect(url_for('admin_dashboard'))
         return page('Admin Login','<div class="wrap"><div class="card"><p class="danger">Invalid username or password.</p></div></div>')
-    return page('Admin Login','''<div class="wrap"><div class="card"><h1>Admin Login</h1><p class="muted">Each administrator can use their own account.</p><form method="post"><input name="username" placeholder="Username" required><div class="pw-wrap"><input id="login-password" type="password" name="password" placeholder="Password" required><button type="button" class="pw-toggle" onclick="togglePassword('login-password',this)">Show password</button></div><button>Login</button></form></div></div>')
+    body = '<div class="wrap"><div class="card"><h1>Admin Login</h1><p class="muted">Each administrator can use their own account.</p><form method="post"><input name="username" placeholder="Username" required><div class="pw-wrap"><input id="login-password" type="password" name="password" placeholder="Password" required><button type="button" class="pw-toggle" onclick="togglePassword(&quot;login-password&quot;,this)">Show password</button></div><button>Login</button></form></div></div>'
+    return page('Admin Login', body)
 
 @app.route('/admin/logout')
 def admin_logout(): session.clear(); return redirect(url_for('home'))
