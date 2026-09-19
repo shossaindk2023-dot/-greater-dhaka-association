@@ -2,6 +2,7 @@ import os, secrets, io
 from datetime import datetime
 from functools import wraps
 from flask import Flask, request, redirect, url_for, session, render_template_string, send_file, abort
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A6
@@ -15,6 +16,14 @@ if db_url.startswith('postgres://'):
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+
+class AdminUser(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(30), default='admin', nullable=False)
+    active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Member(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -71,13 +80,31 @@ def set_setting(key, value):
         db.session.add(x)
     x.value = value
 
+def current_admin():
+    admin_id = session.get('admin_id')
+    if admin_id:
+        return db.session.get(AdminUser, admin_id)
+    return None
+
 def admin_ok():
+    admin = current_admin()
+    if admin and admin.active:
+        return True
     return bool(session.get('admin'))
 
 def admin_required(fn):
     @wraps(fn)
     def wrapper(*a, **kw):
         if not admin_ok(): return redirect(url_for('admin_login'))
+        return fn(*a, **kw)
+    return wrapper
+
+def superadmin_required(fn):
+    @wraps(fn)
+    def wrapper(*a, **kw):
+        admin = current_admin()
+        if not admin or not admin.active or admin.role != 'superadmin':
+            return redirect(url_for('admin_dashboard'))
         return fn(*a, **kw)
     return wrapper
 
@@ -90,6 +117,11 @@ def page(title, body, **ctx):
 
 with app.app_context():
     db.create_all()
+    if AdminUser.query.count() == 0:
+        seed_user = os.getenv('ADMIN_USERNAME', 'admin').strip() or 'admin'
+        seed_password = os.getenv('ADMIN_PASSWORD', 'change-this')
+        db.session.add(AdminUser(username=seed_user, password_hash=generate_password_hash(seed_password), role='superadmin', active=True))
+        db.session.commit()
     if not Setting.query.filter_by(key='fee_amount').first():
         for k in ['fee_amount','bank_name','iban','mobilepay','contact_email','contact_phone']:
             set_setting(k, '')
@@ -185,11 +217,18 @@ def contact():
 @app.route('/admin/login',methods=['GET','POST'])
 def admin_login():
     if request.method=='POST':
-        user=os.getenv('ADMIN_USERNAME','admin'); pw=os.getenv('ADMIN_PASSWORD','change-this')
-        if request.form.get('username')==user and request.form.get('password')==pw:
-            session['admin']=True; return redirect(url_for('admin_dashboard'))
-        return page('Admin Login','<div class="wrap"><div class="card"><p class="danger">Invalid login.</p></div></div>')
-    return page('Admin Login','''<div class="wrap"><div class="card"><h1>Admin Login</h1><form method="post"><input name="username" placeholder="Username" required><input type="password" name="password" placeholder="Password" required><button>Login</button></form></div></div>''')
+        username=request.form.get('username','').strip()
+        password=request.form.get('password','')
+        admin=AdminUser.query.filter_by(username=username).first()
+        if admin and admin.active and check_password_hash(admin.password_hash,password):
+            session.clear()
+            session['admin']=True
+            session['admin_id']=admin.id
+            session['admin_username']=admin.username
+            session['admin_role']=admin.role
+            return redirect(url_for('admin_dashboard'))
+        return page('Admin Login','<div class="wrap"><div class="card"><p class="danger">Invalid username or password.</p></div></div>')
+    return page('Admin Login','''<div class="wrap"><div class="card"><h1>Admin Login</h1><p class="muted">Each administrator can use their own account.</p><form method="post"><input name="username" placeholder="Username" required><input type="password" name="password" placeholder="Password" required><button>Login</button></form></div></div>')
 
 @app.route('/admin/logout')
 def admin_logout(): session.clear(); return redirect(url_for('home'))
@@ -200,6 +239,39 @@ def admin_dashboard():
     members=Member.query.order_by(Member.created_at.desc()).all()
     rows=''.join(f'<tr><td>{m.name}</td><td>{m.application_code}</td><td>{m.status}</td><td>{m.fee_status}</td><td>{("<a href=/admin/approve/"+str(m.id)+">Approve</a>") if m.status=="Pending" else ""}</td></tr>' for m in members)
     return page('Admin Dashboard',f'''<div class="wrap"><div class="card"><h1>Admin Dashboard</h1><p><a href="/admin/settings">Website Settings</a> · <a href="/admin/news">News</a> · <a href="/admin/committee">Committee</a> · <a href="/admin/messages">Messages</a> · <a href="/admin/logout">Logout</a></p></div><div class="card"><h2>Members</h2><table><tr><th>Name</th><th>Application</th><th>Status</th><th>Fee</th><th>Action</th></tr>{rows}</table></div></div>''')
+
+@app.route('/admin/users',methods=['GET','POST'])
+@superadmin_required
+def admin_users():
+    if request.method=='POST':
+        username=request.form.get('username','').strip()
+        password=request.form.get('password','')
+        role=request.form.get('role','admin')
+        if not username or not password:
+            return page('Admin Users','<div class="wrap"><div class="card"><p class="danger">Username and password are required.</p></div></div>')
+        if role not in ('admin','superadmin'): role='admin'
+        if AdminUser.query.filter_by(username=username).first():
+            return page('Admin Users','<div class="wrap"><div class="card"><p class="danger">That username already exists.</p><p><a href="/admin/users">Back</a></p></div></div>')
+        db.session.add(AdminUser(username=username,password_hash=generate_password_hash(password),role=role,active=True))
+        db.session.commit()
+        return redirect(url_for('admin_users'))
+    admins=AdminUser.query.order_by(AdminUser.username).all()
+    current=current_admin()
+    rows=''
+    for a in admins:
+        action='Current account' if a.id == current.id else f'<a href="/admin/users/{a.id}/toggle">{"Deactivate" if a.active else "Activate"}</a>'
+        rows += f'<tr><td>{a.username}</td><td>{a.role}</td><td>{"Active" if a.active else "Inactive"}</td><td>{action}</td></tr>'
+    return page('Admin Users',f'''<div class="wrap"><div class="card"><h1>Admin Users</h1><p><a href="/admin">← Admin Dashboard</a></p><form method="post"><label>Username</label><input name="username" required><label>Password</label><input type="password" name="password" required><label>Role</label><select name="role"><option value="admin">Admin</option><option value="superadmin">Super Admin</option></select><button>Add Admin</button></form></div><div class="card"><h2>Existing Accounts</h2><table><tr><th>Username</th><th>Role</th><th>Status</th><th>Action</th></tr>{rows}</table><p class="muted">Only Super Admin can add or deactivate administrator accounts.</p></div></div>''')
+
+@app.route('/admin/users/<int:user_id>/toggle')
+@superadmin_required
+def toggle_admin_user(user_id):
+    admin=AdminUser.query.get_or_404(user_id)
+    if admin.id == current_admin().id:
+        return redirect(url_for('admin_users'))
+    admin.active=not admin.active
+    db.session.commit()
+    return redirect(url_for('admin_users'))
 
 @app.route('/admin/approve/<int:member_id>')
 @admin_required
