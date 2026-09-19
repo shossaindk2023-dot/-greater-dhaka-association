@@ -8,7 +8,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A6
 import qrcode
 
-app = Flask(__name__)
+app = Flask(__name__)  # GDA Denmark production app
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
 db_url = os.getenv('DATABASE_URL', 'sqlite:///gda.db')
 if db_url.startswith('postgres://'):
