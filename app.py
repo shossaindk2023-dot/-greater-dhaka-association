@@ -238,7 +238,11 @@ def admin_logout(): session.clear(); return redirect(url_for('home'))
 def admin_dashboard():
     members=Member.query.order_by(Member.created_at.desc()).all()
     rows=''.join(f'<tr><td>{m.name}</td><td>{m.application_code}</td><td>{m.status}</td><td>{m.fee_status}</td><td>{("<a href=/admin/approve/"+str(m.id)+">Approve</a>") if m.status=="Pending" else ""}</td></tr>' for m in members)
-    return page('Admin Dashboard',f'''<div class="wrap"><div class="card"><h1>Admin Dashboard</h1><p><a href="/admin/settings">Website Settings</a> · <a href="/admin/news">News</a> · <a href="/admin/committee">Committee</a> · <a href="/admin/messages">Messages</a> · <a href="/admin/logout">Logout</a></p></div><div class="card"><h2>Members</h2><table><tr><th>Name</th><th>Application</th><th>Status</th><th>Fee</th><th>Action</th></tr>{rows}</table></div></div>''')
+    admin=current_admin()
+    user_link = '<a href="/admin/users">Admin Users</a> · ' if admin and admin.role == 'superadmin' else ''
+    links = user_link + '<a href="/admin/manage">Member Management</a> · <a href="/admin/change-password">Change Password</a> · <a href="/admin/settings">Website Settings</a> · <a href="/admin/news">News</a> · <a href="/admin/committee">Committee</a> · <a href="/admin/messages">Messages</a> · <a href="/admin/logout">Logout</a>'
+    body = '<div class="wrap"><div class="card"><h1>Admin Dashboard</h1><p>' + links + '</p></div><div class="card"><h2>Members</h2><table><tr><th>Name</th><th>Application</th><th>Status</th><th>Fee</th><th>Action</th></tr>' + rows + '</table></div></div>'
+    return page('Admin Dashboard', body)
 
 @app.route('/admin/change-password',methods=['GET','POST'])
 @admin_required
