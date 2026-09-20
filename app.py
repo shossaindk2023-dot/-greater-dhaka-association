@@ -1,8 +1,9 @@
-import os, secrets, io
+import os, secrets, io, html
 from datetime import datetime
 from functools import wraps
 from flask import Flask, request, redirect, url_for, session, render_template_string, send_file, abort
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 from flask_sqlalchemy import SQLAlchemy
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A6
@@ -15,6 +16,7 @@ if db_url.startswith('postgres://'):
     db_url = db_url.replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024
 db = SQLAlchemy(app)
 
 class AdminUser(db.Model):
@@ -68,6 +70,14 @@ class Message(db.Model):
     message = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     status = db.Column(db.String(30), default='New')
+
+class GalleryItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(255), nullable=False)
+    caption = db.Column(db.String(255), default='')
+    mime_type = db.Column(db.String(100), nullable=False)
+    image_data = db.Column(db.LargeBinary, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 def setting(key, default=''):
     x = Setting.query.filter_by(key=key).first()
@@ -216,7 +226,7 @@ footer{background:var(--navy2);color:#d8e4f0;margin-top:0}
 <div class="brand-text"><div class="brand-title">Greater Dhaka Association</div><div class="brand-sub">Denmark</div><div class="brand-motto">সম্প্রীতি · সংস্কৃতি · কল্যাণ</div></div>
 </a>
 <nav>
-<a href="/">Home</a><a href="/about">About</a><a href="/committee">Committee</a><a href="/constitution">Constitution</a><a href="/news">News &amp; Events</a><a href="/membership-fee">Membership Fee</a><a href="/register">Join Us</a><a href="/contact">Contact</a><a class="nav-admin" href="/admin/login">Admin Login</a>
+<a href="/">Home</a><a href="/about">About</a><a href="/committee">Committee</a><a href="/constitution">Constitution</a><a href="/news">News &amp; Events</a><a href="/gallery">Gallery</a><a href="/approved-members">Approved Members</a><a href="/membership-fee">Membership Fee</a><a href="/register">Join Us</a><a href="/contact">Contact</a><a class="nav-admin" href="/admin/login">Admin Login</a>
 </nav>
 </div></header>
 ''' + body + '''
@@ -244,7 +254,7 @@ def robots():
 @app.route('/sitemap.xml')
 def sitemap():
     site = request.url_root.rstrip('/')
-    paths = ['/', '/about', '/constitution', '/committee', '/news', '/membership-fee', '/register', '/status', '/contact']
+    paths = ['/', '/about', '/constitution', '/committee', '/news', '/gallery', '/approved-members', '/membership-fee', '/register', '/status', '/contact']
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + ''.join(f'<url><loc>{site}{p}</loc></url>' for p in paths) + '</urlset>'
     return app.response_class(xml, mimetype='application/xml')
 
@@ -324,6 +334,29 @@ def member_card(membership_number):
     c.save(); buf.seek(0)
     return send_file(buf,as_attachment=True,download_name=m.membership_number+'.pdf',mimetype='application/pdf')
 
+@app.route('/gallery')
+def gallery():
+    items=GalleryItem.query.order_by(GalleryItem.created_at.desc()).all()
+    cards=''
+    for x in items:
+        cap=html.escape(x.caption or '')
+        cards += f'<div class="card" style="padding:10px"><img src="/gallery/image/{x.id}" alt="{cap}" style="width:100%;height:240px;object-fit:cover;border-radius:12px"><div style="padding:10px 5px"><b>{cap}</b></div></div>'
+    if not cards:
+        cards='<div class="card"><p class="muted">No gallery photos have been published yet.</p></div>'
+    return page('Gallery',f'<div class="wrap"><div class="section-head"><div><h2>Gallery</h2><p>Photos and memories from Greater Dhaka Association, Denmark.</p></div></div><div class="cards">{cards}</div></div>', description='Gallery of Greater Dhaka Association, Denmark activities and community events.')
+
+@app.route('/gallery/image/<int:item_id>')
+def gallery_image(item_id):
+    item=GalleryItem.query.get_or_404(item_id)
+    return send_file(io.BytesIO(item.image_data), mimetype=item.mime_type, download_name=item.filename)
+
+@app.route('/approved-members')
+def approved_members():
+    members=Member.query.filter_by(status='Approved').order_by(Member.name.asc()).all()
+    rows=''.join(f'<tr><td>{html.escape(m.name)}</td><td>{html.escape(m.membership_number or "")}</td><td>{m.created_at:%d %B %Y}</td></tr>' for m in members)
+    table=('<table><tr><th>Name</th><th>Membership Number</th><th>Member Since</th></tr>'+rows+'</table>') if rows else '<div class="card"><p class="muted">No approved members have been published yet.</p></div>'
+    return page('Approved Members',f'<div class="wrap"><div class="card"><h1>Approved Members</h1><p class="muted">Members whose applications have been approved by the association.</p>{table}</div></div>', description='Approved members of Greater Dhaka Association, Denmark.')
+
 @app.route('/contact',methods=['GET','POST'])
 def contact():
     if request.method=='POST':
@@ -358,7 +391,7 @@ def admin_dashboard():
     rows=''.join(f'<tr><td>{m.name}</td><td>{m.application_code}</td><td>{m.status}</td><td>{m.fee_status}</td><td>{("<a href=/admin/approve/"+str(m.id)+">Approve</a>") if m.status=="Pending" else ""}</td></tr>' for m in members)
     admin=current_admin()
     user_link = '<a href="/admin/users">Admin Users</a> · ' if admin and admin.role == 'superadmin' else ''
-    links = user_link + '<a href="/admin/manage">Member Management</a> · <a href="/admin/change-password">Change Password</a> · <a href="/admin/settings">Website Settings</a> · <a href="/admin/news">News</a> · <a href="/admin/committee">Committee</a> · <a href="/admin/messages">Messages</a> · <a href="/admin/logout">Logout</a>'
+    links = user_link + '<a href="/admin/manage">Member Management</a> · <a href="/admin/gallery">Gallery</a> · <a href="/admin/change-password">Change Password</a> · <a href="/admin/settings">Website Settings</a> · <a href="/admin/news">News</a> · <a href="/admin/committee">Committee</a> · <a href="/admin/messages">Messages</a> · <a href="/admin/logout">Logout</a>'
     body = '<div class="wrap"><div class="card"><h1>Admin Dashboard</h1><p>' + links + '</p></div><div class="card"><h2>Members</h2><table><tr><th>Name</th><th>Application</th><th>Status</th><th>Fee</th><th>Action</th></tr>' + rows + '</table></div></div>'
     return page('Admin Dashboard', body)
 
@@ -422,6 +455,40 @@ def toggle_admin_user(user_id):
 @admin_required
 def approve(member_id):
     m=Member.query.get_or_404(member_id); m.status='Approved'; m.membership_number='GDA-2026-'+str(m.id).zfill(5); db.session.commit(); return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/gallery',methods=['GET','POST'])
+@admin_required
+def admin_gallery():
+    allowed={'image/jpeg','image/png','image/webp','image/gif'}
+    if request.method=='POST':
+        file=request.files.get('image')
+        caption=request.form.get('caption','').strip()
+        if not file or not file.filename:
+            return page('Gallery Manager','<div class="wrap"><div class="card"><p class="danger">Please choose an image.</p><p><a href="/admin/gallery">Back to Gallery</a></p></div></div>')
+        if file.mimetype not in allowed:
+            return page('Gallery Manager','<div class="wrap"><div class="card"><p class="danger">Only JPG, PNG, WEBP or GIF images are allowed.</p></div></div>')
+        data=file.read()
+        if len(data)>8*1024*1024:
+            return page('Gallery Manager','<div class="wrap"><div class="card"><p class="danger">Maximum image size is 8 MB.</p></div></div>')
+        name=secure_filename(file.filename) or 'gallery-image'
+        db.session.add(GalleryItem(filename=name,caption=caption[:255],mime_type=file.mimetype,image_data=data))
+        db.session.commit()
+        return redirect(url_for('admin_gallery'))
+    items=GalleryItem.query.order_by(GalleryItem.created_at.desc()).all()
+    cards=''
+    for x in items:
+        cap=html.escape(x.caption or '')
+        cards += f'<div class="card" style="padding:12px"><img src="/gallery/image/{x.id}" alt="{cap}" style="width:100%;height:180px;object-fit:cover;border-radius:10px"><p><b>{cap}</b></p><a class="danger" href="/admin/gallery/{x.id}/delete">Delete</a></div>'
+    body=f'<div class="wrap"><div class="card"><h1>Gallery Manager</h1><p><a href="/admin">Admin Dashboard</a> · <a href="/gallery">View Gallery</a></p><form method="post" enctype="multipart/form-data"><label>Photo</label><input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif" required><label>Caption</label><input name="caption" maxlength="255" placeholder="e.g. Community Eid Gathering 2026"><button>Upload Photo</button></form><p class="muted">Images are stored in the website database so they remain available after redeploys once the persistent database is connected.</p></div><div class="cards">{cards or "<div class=\"card\"><p class=\"muted\">No photos uploaded yet.</p></div>"}</div></div>'
+    return page('Gallery Manager',body)
+
+@app.route('/admin/gallery/<int:item_id>/delete')
+@admin_required
+def delete_gallery(item_id):
+    item=GalleryItem.query.get_or_404(item_id)
+    db.session.delete(item)
+    db.session.commit()
+    return redirect(url_for('admin_gallery'))
 
 @app.route('/admin/settings',methods=['GET','POST'])
 @admin_required
