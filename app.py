@@ -14,6 +14,9 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
 db_url = os.getenv('DATABASE_URL', 'sqlite:///gda.db')
 if db_url.startswith('postgres://'):
     db_url = db_url.replace('postgres://', 'postgresql://', 1)
+# Render Postgres requires SSL. Add sslmode=require without changing SQLite/local development.
+if db_url.startswith('postgresql://') and 'sslmode=' not in db_url:
+    db_url += ('&' if '?' in db_url else '?') + 'sslmode=require'
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024
