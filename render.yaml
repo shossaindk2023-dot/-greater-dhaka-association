@@ -1,10 +1,11 @@
 services:
   - type: web
-    name: greater-dhaka-association
+    name: greater-dhaka-association-gda
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn wsgi:application
+    startCommand: gunicorn app:app
+    autoDeployTrigger: commit
     envVars:
       - key: SECRET_KEY
         generateValue: true
@@ -13,4 +14,12 @@ services:
       - key: ADMIN_PASSWORD
         sync: false
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: gda-denmark-database
+          property: connectionString
+
+databases:
+  - name: gda-denmark-database
+    plan: free
+    region: frankfurt
+    postgresMajorVersion: "18"
