@@ -148,7 +148,7 @@ nav a:hover{color:var(--red);border-color:var(--red)}
 .nav-admin{background:var(--navy);color:#fff!important;padding:10px 15px!important;border-radius:24px;box-shadow:0 5px 14px rgba(11,55,104,.18)}
 .hero{position:relative;overflow:hidden;min-height:520px;display:flex;align-items:center;background:linear-gradient(110deg,rgba(255,255,255,.94) 0%,rgba(255,255,255,.78) 48%,rgba(255,255,255,.12) 100%),linear-gradient(135deg,#cfe8fb,#f7fbff);border-bottom:1px solid #d7e4ef}
 .hero:before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 82% 30%,rgba(185,138,45,.16),transparent 28%),radial-gradient(circle at 15% 80%,rgba(8,120,63,.10),transparent 25%)}
-.hero:after{content:'';position:absolute;right:4%;top:50%;transform:translateY(-50%);width:min(470px,43vw);height:min(470px,43vw);background:url('/static/img/gda-logo.png') center/contain no-repeat;opacity:.16;filter:drop-shadow(0 15px 30px rgba(6,38,75,.12));pointer-events:none}
+.hero:after{content:'';position:absolute;right:4%;top:50%;transform:translateY(-50%);width:min(470px,43vw);height:min(470px,43vw);background:url('/static/img/gda-logo.svg') center/contain no-repeat;opacity:.16;filter:drop-shadow(0 15px 30px rgba(6,38,75,.12));pointer-events:none}
 .hero-inner{max-width:1220px;width:100%;margin:auto;padding:70px 22px;position:relative;z-index:2}
 .eyebrow{font-size:13px;letter-spacing:3px;font-weight:800;color:var(--navy);text-transform:uppercase}
 .hero h1{font-family:Georgia,serif;font-size:clamp(38px,5vw,68px);line-height:1.05;max-width:720px;margin:12px 0 14px;color:var(--navy2)}
@@ -212,7 +212,7 @@ footer{background:var(--navy2);color:#d8e4f0;margin-top:0}
 <div class="topbar"></div>
 <header><div class="nav">
 <a class="brand" href="/">
-<img src="/static/img/gda-logo.png" alt="Greater Dhaka Association, Denmark logo">
+<img src="/static/img/gda-logo.svg" alt="Greater Dhaka Association, Denmark logo">
 <div class="brand-text"><div class="brand-title">Greater Dhaka Association</div><div class="brand-sub">Denmark</div><div class="brand-motto">সম্প্রীতি · সংস্কৃতি · কল্যাণ</div></div>
 </a>
 <nav>
