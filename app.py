@@ -112,7 +112,116 @@ def page(title, body, **ctx):
     description = ctx.pop('description', 'Greater Dhaka Association, Denmark (GDA Denmark) — a non-profit, non-political social, cultural and welfare association established in 2026.')
     site_url = request.url_root.rstrip('/')
     canonical = request.base_url
-    base = '''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="{{description}}"><meta name="robots" content="index, follow"><link rel="canonical" href="{{canonical}}"><meta property="og:type" content="website"><meta property="og:site_name" content="Greater Dhaka Association, Denmark"><meta property="og:title" content="{{title}} | GDA Denmark"><meta property="og:description" content="{{description}}"><meta property="og:url" content="{{canonical}}"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="{{title}} | GDA Denmark"><meta name="twitter:description" content="{{description}}"><script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Greater Dhaka Association, Denmark","alternateName":"GDA Denmark","url":"{{site_url}}","foundingDate":"2026","description":"A non-profit, non-political social, cultural and welfare association supporting community, culture and welfare."}</script><title>{{title}} | GDA Denmark</title><style>body{font-family:Arial,sans-serif;margin:0;background:#f6f7f9;color:#20242a}header{background:#fff;border-bottom:1px solid #ddd;padding:14px 5%;display:flex;gap:18px;align-items:center;flex-wrap:wrap}header a{text-decoration:none;color:#183b63;font-weight:600}.logo{font-size:21px;font-weight:800;margin-right:auto}.hero{position:relative;overflow:hidden;background:linear-gradient(135deg,#183b63,#24577f);color:#fff;padding:65px 5%;min-height:260px;display:flex;align-items:center}.hero:after{content:'';position:absolute;right:4%;top:50%;transform:translateY(-50%);width:360px;height:360px;background:url('/static/img/gda-logo.png') center/contain no-repeat;opacity:.10;pointer-events:none}.hero .wrap{position:relative;z-index:1}.wrap{max-width:1050px;margin:28px auto;padding:0 18px}.card{background:#fff;padding:24px;border-radius:12px;box-shadow:0 2px 10px #00000010;margin:18px 0}input,textarea,select{width:100%;padding:11px;margin:6px 0 14px;border:1px solid #ccd2da;border-radius:7px;box-sizing:border-box}.pw-wrap{position:relative}.pw-wrap input{padding-right:110px}.pw-toggle{position:absolute;right:6px;top:6px;padding:8px 10px;background:#eef2f6;color:#183b63;border:0;border-radius:6px;font-size:13px}.pw-toggle:hover{background:#dde5ee}button,.btn{background:#183b63;color:#fff;border:0;border-radius:7px;padding:11px 16px;text-decoration:none;display:inline-block;cursor:pointer}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}.muted{color:#68727d}.ok{color:#176b36}.warn{color:#9b5b00}.danger{color:#a32222}table{width:100%;border-collapse:collapse;background:#fff}th,td{padding:10px;border-bottom:1px solid #e4e7eb;text-align:left}footer{text-align:center;padding:35px;color:#69727d}</style><script>function togglePassword(id,btn){var x=document.getElementById(id);if(!x)return;if(x.type==='password'){x.type='text';btn.textContent='Hide password'}else{x.type='password';btn.textContent='Show password'}}</script></head><body><header><div class="logo">GDA Denmark</div><a href="/">Home</a><a href="/about">About</a><a href="/committee">Committee</a><a href="/constitution">Constitution</a><a href="/news">News & Events</a><a href="/membership-fee">Membership Fee</a><a href="/register">Join</a><a href="/contact">Contact</a><a href="/admin/login">Admin Login</a></header>'''+body+'''<footer>Greater Dhaka Association, Denmark · Established 2026<br>Harmony, Culture and Welfare</footer></body></html>'''
+    base = '''<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="{{description}}">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="{{canonical}}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Greater Dhaka Association, Denmark">
+<meta property="og:title" content="{{title}} | GDA Denmark">
+<meta property="og:description" content="{{description}}">
+<meta property="og:url" content="{{canonical}}">
+<meta name="theme-color" content="#0b3768">
+<title>{{title}} | GDA Denmark</title>
+<style>
+:root{--navy:#0b3768;--navy2:#06264b;--red:#d71920;--green:#08783f;--gold:#b98a2d;--ink:#172b45;--muted:#607086;--paper:#fff;--soft:#f4f8fc}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--soft);color:var(--ink);line-height:1.6}
+a{color:var(--navy);text-decoration:none}
+.topbar{height:4px;background:linear-gradient(90deg,var(--green) 0 33%,#fff 33% 66%,var(--red) 66%)}
+header{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.97);backdrop-filter:blur(10px);border-bottom:1px solid #dbe4ee;box-shadow:0 3px 18px rgba(6,38,75,.07)}
+.nav{max-width:1220px;margin:auto;min-height:82px;padding:10px 22px;display:flex;align-items:center;gap:22px}
+.brand{display:flex;align-items:center;gap:13px;margin-right:auto;min-width:245px}
+.brand img{width:62px;height:62px;object-fit:contain}
+.brand-text{line-height:1.08}
+.brand-title{font-family:Georgia,serif;font-size:22px;font-weight:800;color:var(--navy)}
+.brand-sub{font-family:Georgia,serif;font-size:15px;color:var(--navy);font-weight:700;text-align:center;margin-top:3px}
+.brand-motto{font-size:12px;color:var(--green);font-weight:700;text-align:center;margin-top:5px;letter-spacing:.5px}
+nav{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+nav a{font-weight:650;font-size:14px;color:#183c65;padding:8px 2px;border-bottom:2px solid transparent}
+nav a:hover{color:var(--red);border-color:var(--red)}
+.nav-admin{background:var(--navy);color:#fff!important;padding:10px 15px!important;border-radius:24px;box-shadow:0 5px 14px rgba(11,55,104,.18)}
+.hero{position:relative;overflow:hidden;min-height:520px;display:flex;align-items:center;background:linear-gradient(110deg,rgba(255,255,255,.94) 0%,rgba(255,255,255,.78) 48%,rgba(255,255,255,.12) 100%),linear-gradient(135deg,#cfe8fb,#f7fbff);border-bottom:1px solid #d7e4ef}
+.hero:before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 82% 30%,rgba(185,138,45,.16),transparent 28%),radial-gradient(circle at 15% 80%,rgba(8,120,63,.10),transparent 25%)}
+.hero:after{content:'';position:absolute;right:4%;top:50%;transform:translateY(-50%);width:min(470px,43vw);height:min(470px,43vw);background:url('/static/img/gda-logo.png') center/contain no-repeat;opacity:.16;filter:drop-shadow(0 15px 30px rgba(6,38,75,.12));pointer-events:none}
+.hero-inner{max-width:1220px;width:100%;margin:auto;padding:70px 22px;position:relative;z-index:2}
+.eyebrow{font-size:13px;letter-spacing:3px;font-weight:800;color:var(--navy);text-transform:uppercase}
+.hero h1{font-family:Georgia,serif;font-size:clamp(38px,5vw,68px);line-height:1.05;max-width:720px;margin:12px 0 14px;color:var(--navy2)}
+.motto{display:flex;align-items:center;gap:13px;font-size:24px;font-weight:800;color:var(--green);margin:10px 0 18px}
+.motto:before,.motto:after{content:'';height:2px;width:52px;background:var(--red)}
+.hero p{max-width:650px;font-size:18px;color:#38516d;margin:0 0 25px}
+.actions{display:flex;gap:12px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;justify-content:center;background:var(--navy);color:#fff;border:1px solid var(--navy);border-radius:28px;padding:12px 21px;font-weight:750;box-shadow:0 8px 20px rgba(11,55,104,.18)}
+.btn:hover{transform:translateY(-1px)}
+.btn.alt{background:#fff;color:var(--navy);box-shadow:none}
+.quick{background:#fff;border-bottom:1px solid #e2eaf2}
+.quick-grid{max-width:1220px;margin:auto;display:grid;grid-template-columns:repeat(4,1fr)}
+.quick-item{padding:27px 20px;text-align:center;border-right:1px solid #e3eaf2}
+.quick-item:last-child{border-right:0}
+.quick-icon{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;margin:0 auto 9px;background:#edf5fb;font-size:22px}
+.quick h3{margin:0 0 4px;color:var(--navy);font-size:17px}
+.quick p{margin:0;color:var(--muted);font-size:14px}
+.wrap{max-width:1220px;margin:0 auto;padding:54px 22px}
+.section-head{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:22px}
+.section-head h2{font-family:Georgia,serif;color:var(--navy);font-size:31px;margin:0}
+.section-head p{margin:5px 0 0;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.card{background:var(--paper);padding:27px;border:1px solid #e1e9f2;border-radius:18px;box-shadow:0 8px 28px rgba(6,38,75,.06);margin:0}
+.card h2,.card h3{color:var(--navy);margin-top:0}
+.card p{color:#53657a}
+.feature{position:relative;overflow:hidden}
+.feature:before{content:'';position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--green)}
+.feature:nth-child(2):before{background:var(--red)}
+.feature:nth-child(3):before{background:var(--gold)}
+.news-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:20px}
+.list-item{display:flex;gap:15px;padding:15px 0;border-bottom:1px solid #e7edf3}
+.list-item:last-child{border-bottom:0}
+.datebox{min-width:58px;height:58px;border-radius:10px;background:#edf4fb;text-align:center;padding:7px 4px;color:var(--navy);font-weight:800;font-size:12px}
+.datebox strong{display:block;font-size:19px;line-height:1}
+.list-item h3{font-size:16px;margin:0;color:var(--navy)}
+.list-item p{font-size:14px;margin:3px 0;color:var(--muted)}
+.cta{margin:0 22px 54px;border-radius:22px;overflow:hidden;background:linear-gradient(110deg,var(--navy2),var(--navy));color:#fff}
+.cta-inner{max-width:1220px;margin:auto;padding:42px 36px;display:flex;align-items:center;justify-content:space-between;gap:25px}
+.cta h2{font-family:Georgia,serif;margin:0 0 7px;font-size:31px}
+.cta p{margin:0;color:#dbe8f5}
+.cta .btn{background:#fff;color:var(--navy);border-color:#fff}
+.page-hero{background:linear-gradient(120deg,var(--navy2),var(--navy));color:#fff;padding:54px 22px}
+.page-hero h1{max-width:1220px;margin:0 auto;font-family:Georgia,serif;font-size:42px}
+input,textarea,select{width:100%;padding:12px 13px;margin:6px 0 14px;border:1px solid #cbd7e4;border-radius:9px;box-sizing:border-box;background:#fff}
+button{background:var(--navy);color:#fff;border:0;border-radius:9px;padding:12px 18px;font-weight:700;cursor:pointer}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden}
+th,td{padding:11px;border-bottom:1px solid #e4eaf1;text-align:left}
+footer{background:var(--navy2);color:#d8e4f0;margin-top:0}
+.footer-inner{max-width:1220px;margin:auto;padding:38px 22px;display:flex;justify-content:space-between;gap:20px;align-items:center}
+.footer-title{font-family:Georgia,serif;font-size:18px;color:#fff}
+.footer-motto{color:#fff;font-weight:700}
+.footer-tag{font-style:italic;color:#cbd9e8}
+.pw-wrap{position:relative}.pw-wrap input{padding-right:115px}.pw-toggle{position:absolute;right:6px;top:6px;padding:8px 10px;background:#eef3f8;color:var(--navy);border:0;border-radius:6px;font-size:12px}
+.muted{color:var(--muted)}.ok{color:#176b36}.warn{color:#9b5b00}.danger{color:#a32222}
+@media(max-width:950px){nav{gap:10px}.nav{flex-wrap:wrap}.brand{min-width:210px}.hero:after{opacity:.10}.cards{grid-template-columns:1fr}.news-grid{grid-template-columns:1fr}.quick-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:650px){.nav{padding:10px 14px}.brand img{width:52px;height:52px}.brand-title{font-size:18px}.brand-sub{font-size:13px}.hero{min-height:600px}.hero-inner{padding:55px 18px}.hero:after{width:330px;height:330px;right:-75px;top:70%;opacity:.11}.hero h1{font-size:39px}.motto{font-size:20px}.quick-grid{grid-template-columns:1fr 1fr}.quick-item{padding:20px 8px}.wrap{padding:42px 16px}.cta{margin:0 16px 42px}.cta-inner{padding:32px 22px;display:block}.cta .btn{margin-top:20px}.footer-inner{display:block;text-align:center}.footer-tag{margin-top:8px}}
+</style>
+<script>function togglePassword(id,btn){var x=document.getElementById(id);if(!x)return;if(x.type==='password'){x.type='text';btn.textContent='Hide password'}else{x.type='password';btn.textContent='Show password'}}</script>
+</head>
+<body>
+<div class="topbar"></div>
+<header><div class="nav">
+<a class="brand" href="/">
+<img src="/static/img/gda-logo.png" alt="Greater Dhaka Association, Denmark logo">
+<div class="brand-text"><div class="brand-title">Greater Dhaka Association</div><div class="brand-sub">Denmark</div><div class="brand-motto">সম্প্রীতি · সংস্কৃতি · কল্যাণ</div></div>
+</a>
+<nav>
+<a href="/">Home</a><a href="/about">About</a><a href="/committee">Committee</a><a href="/constitution">Constitution</a><a href="/news">News &amp; Events</a><a href="/membership-fee">Membership Fee</a><a href="/register">Join Us</a><a href="/contact">Contact</a><a class="nav-admin" href="/admin/login">Admin Login</a>
+</nav>
+</div></header>
+''' + body + '''
+<footer><div class="footer-inner"><div><div class="footer-title">Greater Dhaka Association, Denmark</div><div>Established 2026 · Harmony, Culture and Welfare</div></div><div class="footer-motto">সম্প্রীতি · সংস্কৃতি · কল্যাণ</div><div class="footer-tag">Connecting Cultures, Supporting Lives ♡</div></div></footer>
+</body></html>'''
     return render_template_string(base, title=title, description=description, canonical=canonical, site_url=site_url, **ctx)
 
 with app.app_context():
@@ -141,7 +250,15 @@ def sitemap():
 
 @app.route('/')
 def home():
-    return page('Home','''<section class="hero"><div class="wrap"><h1>Greater Dhaka Association, Denmark</h1><p>Harmony, Culture and Welfare</p><p>Connecting our community, preserving our culture and supporting one another in Denmark.</p><a class="btn" href="/register">Apply for Membership</a></div></section><div class="wrap"><div class="grid"><div class="card"><h2>Our Association</h2><p>A non-profit, non-political social and cultural association connecting people from Greater Dhaka and supporting community welfare.</p></div><div class="card"><h2>Membership</h2><p>Submit your membership application online and keep your application reference for status checking.</p><a class="btn" href="/status">Check Application</a></div><div class="card"><h2>Verification</h2><p>Approved members can be verified online using their membership number.</p></div></div></div>''', description='Greater Dhaka Association, Denmark (GDA Denmark) — connecting the Greater Dhaka community through harmony, culture and welfare.')
+    news_rows=News.query.order_by(News.created_at.desc()).limit(3).all()
+    news_html=''.join(f'<div class="list-item"><div class="datebox"><strong>{x.created_at:%d}</strong>{x.created_at:%b}</div><div><h3>{x.title}</h3><p>{x.body[:150]}{"..." if len(x.body)>150 else ""}</p></div></div>' for x in news_rows)
+    if not news_html:
+        news_html='<div class="list-item"><div class="datebox"><strong>—</strong></div><div><h3>Welcome to GDA Denmark</h3><p>Community news and announcements will appear here.</p></div></div>'
+    return page('Home',f'''<section class="hero"><div class="hero-inner"><div class="eyebrow">WELCOME TO OUR COMMUNITY</div><h1>Greater Dhaka Association, Denmark</h1><div class="motto">সম্প্রীতি · সংস্কৃতি · কল্যাণ</div><p>Bringing together the people of Greater Dhaka, preserving our culture, supporting our community and building a stronger future in Denmark.</p><div class="actions"><a class="btn" href="/register">Join Our Association&nbsp; →</a><a class="btn alt" href="/about">Learn More</a></div></div></section>
+<section class="quick"><div class="quick-grid"><div class="quick-item"><div class="quick-icon">👥</div><h3>Our Community</h3><p>United by our roots, stronger together.</p></div><div class="quick-item"><div class="quick-icon">🌿</div><h3>Culture &amp; Heritage</h3><p>Preserving our culture and identity.</p></div><div class="quick-item"><div class="quick-icon">🤝</div><h3>Support &amp; Welfare</h3><p>Helping each other and our community.</p></div><div class="quick-item"><div class="quick-icon">📅</div><h3>Events &amp; Activities</h3><p>Stay connected with our activities.</p></div></div></section>
+<div class="wrap"><div class="section-head"><div><h2>What We Stand For</h2><p>Our work is guided by community, culture and welfare.</p></div></div><div class="cards"><div class="card feature"><h3>Community</h3><p>Connecting people from Greater Dhaka and creating a welcoming community in Denmark.</p></div><div class="card feature"><h3>Culture &amp; Heritage</h3><p>Celebrating Bangladeshi language, traditions, history and the heritage of Greater Dhaka.</p></div><div class="card feature"><h3>Welfare</h3><p>Supporting members and families through mutual assistance, information and community initiatives.</p></div></div></div>
+<div class="wrap" style="padding-top:0"><div class="news-grid"><div class="card"><div class="section-head"><div><h2 style="font-size:26px">Latest News</h2><p>Updates from the association.</p></div><a href="/news">View all →</a></div>{news_html}</div><div class="card"><div class="section-head"><div><h2 style="font-size:26px">Get Involved</h2><p>Be part of our growing community.</p></div></div><p>Become a member, take part in cultural activities and help build a supportive community for everyone.</p><p><a class="btn" href="/register">Become a Member</a></p><p><a href="/membership-fee">View membership fee information →</a></p></div></div></div>
+<section class="cta"><div class="cta-inner"><div><h2>Together, we can build a stronger community.</h2><p>Connecting cultures, supporting lives and keeping our roots alive in Denmark.</p></div><a class="btn" href="/contact">Contact Us →</a></div></section>''', description='Greater Dhaka Association, Denmark (GDA Denmark) — connecting the Greater Dhaka community through harmony, culture and welfare.')
 
 @app.route('/about')
 def about(): return page('About','''<div class="wrap"><div class="card"><h1>About GDA Denmark</h1><p>Greater Dhaka Association, Denmark was established in 2026. The association aims to promote harmony, Bangladeshi culture and community welfare.</p><p><b>Motto:</b> Harmony, Culture and Welfare</p><p><b>বাংলা:</b> সম্প্রীতি, সংস্কৃতি ও কল্যাণ</p></div></div>''', description='Learn about Greater Dhaka Association, Denmark, established in 2026 to promote harmony, Bangladeshi culture and community welfare.')
