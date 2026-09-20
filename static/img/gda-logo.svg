@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">
+<defs><style>
+.t{font-family:Georgia,serif;font-weight:700;fill:#12345f}.bn{font-family:serif;font-weight:700;fill:#185c35}
+</style></defs>
+<circle cx="500" cy="500" r="485" fill="#fff" stroke="#12345f" stroke-width="22"/>
+<circle cx="500" cy="500" r="455" fill="none" stroke="#b98a2d" stroke-width="5"/>
+<text x="500" y="105" text-anchor="middle" class="t" font-size="54">GREATER DHAKA ASSOCIATION</text>
+<text x="500" y="870" text-anchor="middle" class="t" font-size="43" fill="#b51f24">DENMARK</text>
+<text x="500" y="918" text-anchor="middle" class="t" font-size="25">EST - 2026</text>
+<text x="500" y="955" text-anchor="middle" class="bn" font-size="29">সম্প্রীতি • সংস্কৃতি • কল্যাণ</text>
+<path d="M155 420 Q250 365 345 420 L345 620 Q250 670 155 620Z" fill="#dff2ff" stroke="#87b9d8" stroke-width="3"/>
+<path d="M655 420 Q750 365 845 420 L845 620 Q750 670 655 620Z" fill="#dff2ff" stroke="#87b9d8" stroke-width="3"/>
+<path d="M150 615 Q300 560 450 620 T850 615" fill="none" stroke="#4da4d8" stroke-width="24"/>
+<path d="M235 400 L235 250 M235 250 L350 250 L350 315 L235 315" stroke="#777" stroke-width="6" fill="none"/>
+<path d="M242 258 L342 258 L342 307 L242 307" fill="#07883f"/><circle cx="292" cy="282" r="18" fill="#e31b23"/>
+<path d="M690 400 L690 245 M690 245 L815 245 L815 320 L690 320" stroke="#777" stroke-width="6" fill="none"/>
+<path d="M696 253 L807 253 L807 312 L696 312" fill="#d71920"/><path d="M730 253 V312 M696 282 H807" stroke="#fff" stroke-width="12"/>
+<g transform="translate(365 330)" fill="#d45c57" stroke="#9f3e3b" stroke-width="3"><rect x="0" y="70" width="250" height="125" rx="4"/><path d="M20 70 Q125 5 230 70Z"/><rect x="105" y="0" width="40" height="70"/><path d="M112 0 Q125 -28 138 0Z"/></g>
+<g transform="translate(155 480)" stroke="#1a1a1a"><circle cx="70" cy="115" r="52" fill="none" stroke-width="10"/><circle cx="210" cy="115" r="52" fill="none" stroke-width="10"/><path d="M70 115 L115 55 L175 115 L210 115 L165 45 L115 55" fill="#9b241d" stroke-width="8"/><path d="M115 55 L90 15 L150 15 L165 45" fill="#c83a25" stroke-width="7"/></g>
+<g fill="#12345f"><circle cx="500" cy="610" r="28"/><path d="M468 650 Q500 625 532 650 L545 790 L455 790Z"/><circle cx="420" cy="650" r="22"/><path d="M395 680 Q420 660 445 680 L452 770 L388 770Z"/><circle cx="580" cy="650" r="22"/><path d="M555 680 Q580 660 605 680 L612 770 L548 770Z"/><path d="M448 685 L405 720 M552 685 L595 720 M455 690 L420 735 M545 690 L580 735" stroke="#12345f" stroke-width="14" fill="none"/></g>
+<text x="500" y="995" text-anchor="middle" class="t" font-size="18">CONNECTING CULTURES, SUPPORTING LIVES</text>
+</svg>
