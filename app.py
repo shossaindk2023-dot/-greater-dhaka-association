@@ -556,6 +556,8 @@ def mark_fee_paid(member_id):
     return redirect(url_for('admin_manage'))
 
 @app.route('/health')
-def health(): return {'status':'ok'}
+def health():
+    backend = 'postgres' if db_url.startswith('postgresql://') else 'sqlite'
+    return {'status':'ok','database_backend':backend}
 
 if __name__=='__main__': app.run(host='0.0.0.0',port=int(os.getenv('PORT',5000)))
