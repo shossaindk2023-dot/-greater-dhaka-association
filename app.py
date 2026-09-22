@@ -229,7 +229,7 @@ footer{background:var(--navy2);color:#d8e4f0;margin-top:0}
 <div class="brand-text"><div class="brand-title">Greater Dhaka Association</div><div class="brand-sub">Denmark</div><div class="brand-motto">সম্প্রীতি · সংস্কৃতি · কল্যাণ</div></div>
 </a>
 <nav>
-<a href="/">Home</a><a href="/about">About</a><a href="/committee">Committee</a><a href="/constitution">Constitution</a><a href="/news">News &amp; Events</a><a href="/gallery">Gallery</a><a href="/approved-members">Approved Members</a><a href="/membership-fee">Membership Fee</a><a href="/register">Join Us</a><a href="/contact">Contact</a><a class="nav-admin" href="/admin/login">Admin Login</a>
+<a href="/">Home</a><a href="/about">About</a><a href="/committee">Committee</a><a href="/constitution">Constitution</a><a href="/news">News &amp; Events</a><a href="/gallery">Gallery</a><a href="/approved-members">Approved Members</a><a href="/membership-fee">Membership Fee</a><a href="/register">Join Us</a><a href="/contact">Contact</a>
 </nav>
 </div></header>
 ''' + body + '''
