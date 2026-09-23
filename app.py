@@ -229,7 +229,7 @@ footer{background:var(--navy2);color:#d8e4f0;margin-top:0}
 <div class="brand-text"><div class="brand-title">Greater Dhaka Association</div><div class="brand-sub">Denmark</div><div class="brand-motto">সম্প্রীতি · সংস্কৃতি · কল্যাণ</div></div>
 </a>
 <nav>
-<a href="/">Home</a><a href="/about">About</a><a href="/committee">Committee</a><a href="/constitution">Constitution</a><a href="/news">News &amp; Events</a><a href="/gallery">Gallery</a><a href="/approved-members">Approved Members</a><a href="/membership-fee">Membership Fee</a><a href="/register">Join Us</a><a href="/contact">Contact</a>
+<a href="/">Home</a><a href="/about">About</a><a href="/committee">Committee</a><a href="/constitution">Constitution</a><a href="/news">News &amp; Events</a><a href="/gallery">Gallery</a><a href="/membership-fee">Membership Fee</a><a href="/register">Join Us</a><a href="/contact">Contact</a>
 </nav>
 </div></header>
 ''' + body + '''
@@ -354,6 +354,7 @@ def gallery_image(item_id):
     return send_file(io.BytesIO(item.image_data), mimetype=item.mime_type, download_name=item.filename)
 
 @app.route('/approved-members')
+@admin_required
 def approved_members():
     members=Member.query.filter_by(status='Approved').order_by(Member.name.asc()).all()
     rows=''.join(f'<tr><td>{html.escape(m.name)}</td><td>{html.escape(m.membership_number or "")}</td><td>{m.created_at:%d %B %Y}</td></tr>' for m in members)
@@ -394,7 +395,7 @@ def admin_dashboard():
     rows=''.join(f'<tr><td>{m.name}</td><td>{m.application_code}</td><td>{m.status}</td><td>{m.fee_status}</td><td>{("<a href=/admin/approve/"+str(m.id)+">Approve</a>") if m.status=="Pending" else ""}</td></tr>' for m in members)
     admin=current_admin()
     user_link = '<a href="/admin/users">Admin Users</a> · ' if admin and admin.role == 'superadmin' else ''
-    links = user_link + '<a href="/admin/manage">Member Management</a> · <a href="/admin/gallery">Gallery</a> · <a href="/admin/change-password">Change Password</a> · <a href="/admin/settings">Website Settings</a> · <a href="/admin/news">News</a> · <a href="/admin/committee">Committee</a> · <a href="/admin/messages">Messages</a> · <a href="/admin/logout">Logout</a>'
+    links = user_link + '<a href="/admin/manage">Member Management</a> · <a href="/approved-members">Approved Members</a> · <a href="/admin/gallery">Gallery</a> · <a href="/admin/change-password">Change Password</a> · <a href="/admin/settings">Website Settings</a> · <a href="/admin/news">News</a> · <a href="/admin/committee">Committee</a> · <a href="/admin/messages">Messages</a> · <a href="/admin/logout">Logout</a>'
     body = '<div class="wrap"><div class="card"><h1>Admin Dashboard</h1><p>' + links + '</p></div><div class="card"><h2>Members</h2><table><tr><th>Name</th><th>Application</th><th>Status</th><th>Fee</th><th>Action</th></tr>' + rows + '</table></div></div>'
     return page('Admin Dashboard', body)
 
