@@ -392,7 +392,7 @@ def admin_logout(): session.clear(); return redirect(url_for('home'))
 @admin_required
 def admin_dashboard():
     members=Member.query.order_by(Member.created_at.desc()).all()
-    rows=''.join(f'<tr><td>{m.name}</td><td>{m.application_code}</td><td>{m.status}</td><td>{m.fee_status}</td><td>{("<a href=/admin/approve/"+str(m.id)+">Approve</a>") if m.status=="Pending" else ""}</td></tr>' for m in members)
+    rows=''.join(f'<tr><td>{html.escape(m.name)}</td><td>{html.escape(m.application_code)}</td><td>{html.escape(m.status)}</td><td>{html.escape(m.fee_status)}</td><td>{("<a href=/admin/application/"+str(m.id)+">Review Application</a>") if m.status=="Pending" else ("<a href=/admin/application/"+str(m.id)+">View</a>")}</td></tr>' for m in members)
     admin=current_admin()
     user_link = '<a href="/admin/users">Admin Users</a> · ' if admin and admin.role == 'superadmin' else ''
     links = user_link + '<a href="/admin/manage">Member Management</a> · <a href="/approved-members">Approved Members</a> · <a href="/admin/gallery">Gallery</a> · <a href="/admin/change-password">Change Password</a> · <a href="/admin/settings">Website Settings</a> · <a href="/admin/news">News</a> · <a href="/admin/committee">Committee</a> · <a href="/admin/messages">Messages</a> · <a href="/admin/logout">Logout</a>'
@@ -454,6 +454,32 @@ def toggle_admin_user(user_id):
     admin.active=not admin.active
     db.session.commit()
     return redirect(url_for('admin_users'))
+
+@app.route('/admin/application/<int:member_id>')
+@admin_required
+def review_application(member_id):
+    m=Member.query.get_or_404(member_id)
+    def val(value):
+        return html.escape(str(value or '')) or '<span class="muted">Not provided</span>'
+    rows = ''.join([
+        '<tr><th>Application Reference</th><td>' + val(m.application_code) + '</td></tr>',
+        '<tr><th>Full Name</th><td>' + val(m.name) + '</td></tr>',
+        '<tr><th>Father\'s Name</th><td>' + val(m.father_name) + '</td></tr>',
+        '<tr><th>Grandfather\'s Name</th><td>' + val(m.grandfather_name) + '</td></tr>',
+        '<tr><th>Address in Bangladesh</th><td>' + val(m.address_bd).replace('\\n','<br>') + '</td></tr>',
+        '<tr><th>Present Address in Denmark</th><td>' + val(m.address_dk).replace('\\n','<br>') + '</td></tr>',
+        '<tr><th>Email</th><td>' + val(m.email) + '</td></tr>',
+        '<tr><th>Phone</th><td>' + val(m.phone) + '</td></tr>',
+        '<tr><th>Application Date</th><td>' + (m.created_at.strftime('%d %B %Y, %H:%M') if m.created_at else '<span class="muted">Not available</span>') + '</td></tr>',
+        '<tr><th>Status</th><td>' + val(m.status) + '</td></tr>',
+        '<tr><th>Fee Status</th><td>' + val(m.fee_status) + '</td></tr>'
+    ])
+    if m.status == 'Pending':
+        actions = '<p style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn" href="/admin/approve/' + str(m.id) + '">Approve Application</a><a class="btn alt" href="/admin/manage">Back to Applications</a></p>'
+    else:
+        actions = '<p><a class="btn alt" href="/admin/manage">Back to Applications</a></p>'
+    body = '<div class="wrap"><div class="card"><h1>Review Membership Application</h1><p class="muted">Please check the applicant\'s submitted information carefully before approving.</p><table>' + rows + '</table>' + actions + '</div></div>'
+    return page('Review Membership Application', body)
 
 @app.route('/admin/approve/<int:member_id>')
 @admin_required
@@ -537,7 +563,9 @@ def admin_manage():
     for m in members:
         actions=[]
         if m.status != 'Approved':
-            actions.append('<a href="/admin/approve/' + str(m.id) + '">Approve</a>')
+            actions.append('<a href="/admin/application/' + str(m.id) + '">Review Application</a>')
+        else:
+            actions.append('<a href="/admin/application/' + str(m.id) + '">View Application</a>')
         if m.fee_status != 'Paid':
             actions.append('<a href="/admin/member/' + str(m.id) + '/fee-paid">Mark fee paid</a>')
         if m.membership_number:
