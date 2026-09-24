@@ -6,7 +6,11 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from flask_sqlalchemy import SQLAlchemy
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A6
+from reportlab.lib.pagesizes import A6, A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.enums import TA_CENTER
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 import qrcode
 
 app = Flask(__name__)  # GDA Denmark production app
@@ -560,6 +564,7 @@ def google_site_verification():
 def admin_manage():
     members=Member.query.order_by(Member.created_at.desc()).all()
     rows=[]
+    admin=current_admin()
     for m in members:
         actions=[]
         if m.status != 'Approved':
@@ -570,11 +575,74 @@ def admin_manage():
             actions.append('<a href="/admin/member/' + str(m.id) + '/fee-paid">Mark fee paid</a>')
         if m.membership_number:
             actions.append('<a href="/member-card/' + m.membership_number + '.pdf">Member card PDF</a>')
+        if m.status == 'Approved' and admin and admin.role == 'superadmin':
+            actions.append('<a href="/admin/member/' + str(m.id) + '/delete" style="color:#a32222;font-weight:700">Delete Approved Member</a>')
         action_text=' | '.join(actions) if actions else '-'
-        rows.append('<tr><td>' + m.name + '</td><td>' + m.application_code + '</td><td>' + m.status + '</td><td>' + m.fee_status + '</td><td>' + action_text + '</td></tr>')
+        rows.append('<tr><td>' + html.escape(m.name) + '</td><td>' + html.escape(m.application_code) + '</td><td>' + html.escape(m.status) + '</td><td>' + html.escape(m.fee_status) + '</td><td>' + action_text + '</td></tr>')
     table=''.join(rows) if rows else '<tr><td colspan="5">No applications yet.</td></tr>'
-    body='<div class="wrap"><div class="card"><h1>GDA Member Management</h1><p><a href="/admin">Admin Dashboard</a> | <a href="/admin/logout">Logout</a></p><table><tr><th>Name</th><th>Application</th><th>Status</th><th>Fee</th><th>Actions</th></tr>' + table + '</table></div></div>'
+    body='<div class="wrap"><div class="card"><h1>GDA Member Management</h1><p><a href="/admin">Admin Dashboard</a> | <a href="/admin/approved-members-pdf">📄 Print Approved Members PDF</a> | <a href="/admin/logout">Logout</a></p><p class="muted">Approved members can be permanently deleted by a Super Admin if an application was approved by mistake.</p><table><tr><th>Name</th><th>Application</th><th>Status</th><th>Fee</th><th>Actions</th></tr>' + table + '</table></div></div>'
     return page('Member Management', body)
+
+@app.route('/admin/approved-members-pdf')
+@admin_required
+def approved_members_pdf():
+    members = Member.query.filter_by(status='Approved').order_by(Member.name.asc()).all()
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    styles = getSampleStyleSheet()
+    title_style = styles['Title']
+    title_style.alignment = TA_CENTER
+    story = [
+        Paragraph('Greater Dhaka Association, Denmark', title_style),
+        Paragraph('Approved Members List — Established 2026', styles['Heading2']),
+        Spacer(1, 12)
+    ]
+    data = [['No.', 'Member Name', 'Membership Number', 'Member Since', 'Fee']]
+    for i, m in enumerate(members, 1):
+        data.append([
+            str(i),
+            m.name or '',
+            m.membership_number or '',
+            m.created_at.strftime('%d %B %Y') if m.created_at else '',
+            m.fee_status or 'Unpaid'
+        ])
+    if len(data) == 1:
+        data.append(['—', 'No approved members yet', '—', '—', '—'])
+    table = Table(data, colWidths=[35, 170, 115, 95, 55], repeatRows=1)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#0b3768')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd7e4')),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#f4f8fc')]),
+        ('TOPPADDING', (0,0), (-1,-1), 7),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 7),
+    ]))
+    story.append(table)
+    story.append(Spacer(1, 14))
+    story.append(Paragraph(f'Total approved members: {len(members)}', styles['Normal']))
+    story.append(Spacer(1, 8))
+    story.append(Paragraph('Greater Dhaka Association, Denmark · সম্প্রীতি · সংস্কৃতি · কল্যাণ', styles['Normal']))
+    doc.build(story)
+    buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name='GDA_Denmark_Approved_Members_List.pdf', mimetype='application/pdf')
+
+@app.route('/admin/member/<int:member_id>/delete', methods=['GET','POST'])
+@superadmin_required
+def delete_approved_member(member_id):
+    member = Member.query.get_or_404(member_id)
+    if member.status != 'Approved':
+        return redirect(url_for('admin_manage'))
+    if request.method == 'POST':
+        db.session.delete(member)
+        db.session.commit()
+        return redirect(url_for('admin_manage'))
+    name = html.escape(member.name)
+    membership = html.escape(member.membership_number or 'No membership number')
+    return f'''<div class="wrap"><div class="card"><h1 style="color:#a32222">Delete Approved Member?</h1><p>You are about to permanently delete:</p><p><strong>Name:</strong> {name}<br><strong>Membership Number:</strong> {membership}</p><p style="color:#a32222"><strong>This cannot be undone.</strong> The member record will be removed, and the membership number will no longer verify or generate a member card.</p><form method="post" style="display:flex;gap:10px;flex-wrap:wrap"><button type="submit" style="background:#a32222">Yes, Delete Member</button><a href="/admin/manage" class="btn alt">Cancel</a></form></div></div>'''
 
 @app.route('/admin/member/<int:member_id>/fee-paid')
 @admin_required
