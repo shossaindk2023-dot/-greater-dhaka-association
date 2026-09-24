@@ -1,7 +1,13 @@
 from app import app, db, Member, current_admin
-from flask import session, redirect, url_for, request
+from flask import session, redirect, url_for, request, send_file
 from functools import wraps
 import html
+import io
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.enums import TA_CENTER
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 
 # Google Search Console HTML-file verification.
 @app.route('/google827a650554bab237.html')
@@ -50,12 +56,60 @@ def admin_manage():
     table = ''.join(rows) or '<tr><td colspan="5">No applications yet.</td></tr>'
     return f'''<div style="font-family:Arial,sans-serif;max-width:1200px;margin:30px auto;padding:20px">
     <h1>GDA Member Management</h1>
-    <p><a href="/admin">← Admin Dashboard</a> &nbsp; <a href="/admin/logout">Logout</a></p>
+    <p><a href="/admin">← Admin Dashboard</a> &nbsp; <a href="/admin/approved-members-pdf">📄 Print Approved Members PDF</a> &nbsp; <a href="/admin/logout">Logout</a></p>
     <p style="color:#607086">Approved members can be deleted by a Super Admin if an application was approved by mistake.</p>
     <table style="width:100%;border-collapse:collapse">
     <tr><th style="text-align:left;padding:10px;border-bottom:1px solid #ddd">Name</th><th style="text-align:left;padding:10px;border-bottom:1px solid #ddd">Application</th><th style="text-align:left;padding:10px;border-bottom:1px solid #ddd">Status</th><th style="text-align:left;padding:10px;border-bottom:1px solid #ddd">Fee</th><th style="text-align:left;padding:10px;border-bottom:1px solid #ddd">Actions</th></tr>
     {table}</table>
     </div>'''
+
+@app.route('/admin/approved-members-pdf')
+@_admin_required
+def approved_members_pdf():
+    members = Member.query.filter_by(status='Approved').order_by(Member.name.asc()).all()
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    styles = getSampleStyleSheet()
+    title_style = styles['Title']
+    title_style.alignment = TA_CENTER
+    story = [
+        Paragraph('Greater Dhaka Association, Denmark', title_style),
+        Paragraph('Approved Members List — Established 2026', styles['Heading2']),
+        Spacer(1, 12)
+    ]
+    data = [['No.', 'Member Name', 'Membership Number', 'Member Since', 'Fee']]
+    for i, m in enumerate(members, 1):
+        data.append([
+            str(i),
+            m.name or '',
+            m.membership_number or '',
+            m.created_at.strftime('%d %B %Y') if m.created_at else '',
+            m.fee_status or 'Unpaid'
+        ])
+    if len(data) == 1:
+        data.append(['—', 'No approved members yet', '—', '—', '—'])
+    table = Table(data, colWidths=[35, 170, 115, 95, 55], repeatRows=1)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#0b3768')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd7e4')),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#f4f8fc')]),
+        ('TOPPADDING', (0,0), (-1,-1), 7),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 7),
+    ]))
+    story.append(table)
+    story.append(Spacer(1, 14))
+    story.append(Paragraph(f'Total approved members: {len(members)}', styles['Normal']))
+    story.append(Spacer(1, 8))
+    story.append(Paragraph('Greater Dhaka Association, Denmark · সম্প্রীতি · সংস্কৃতি · কল্যাণ', styles['Normal']))
+    doc.build(story)
+    buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name='GDA_Denmark_Approved_Members_List.pdf', mimetype='application/pdf')
+
 
 @app.route('/admin/member/<int:member_id>/delete', methods=['GET','POST'])
 @_superadmin_required
