@@ -1,5 +1,5 @@
-from app import app, db, Member, current_admin
-from flask import session, redirect, url_for, request, send_file
+from app import app, db, Member, current_admin, page
+from flask import session, redirect, url_for, request, send_file, Response
 from functools import wraps
 import html
 import io
@@ -110,7 +110,6 @@ def approved_members_pdf():
     buf.seek(0)
     return send_file(buf, as_attachment=True, download_name='GDA_Denmark_Approved_Members_List.pdf', mimetype='application/pdf')
 
-
 @app.route('/admin/member/<int:member_id>/delete', methods=['GET','POST'])
 @_superadmin_required
 def delete_approved_member(member_id):
@@ -141,5 +140,122 @@ def mark_fee_paid(member_id):
     member.fee_status = 'Paid'
     db.session.commit()
     return redirect(url_for('admin_manage'))
+
+# ---------------------------------------------------------------------------
+# Constitution management
+# ---------------------------------------------------------------------------
+# The uploaded Constitution PDF is stored in PostgreSQL/SQLite, so it survives
+# Render deploys when the persistent database is connected.
+class ConstitutionDocument(db.Model):
+    __tablename__ = 'constitution_documents'
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(255), nullable=False)
+    mime_type = db.Column(db.String(100), nullable=False, default='application/pdf')
+    pdf_data = db.Column(db.LargeBinary, nullable=False)
+    uploaded_at = db.Column(db.DateTime, default=__import__('datetime').datetime.utcnow, nullable=False)
+
+with app.app_context():
+    db.create_all()
+
+# Public Constitution page: this remains available from the Home-page navigation.
+# If a PDF has been uploaded by an administrator, visitors get View/Download links.
+def _constitution_page():
+    doc = ConstitutionDocument.query.order_by(ConstitutionDocument.uploaded_at.desc(), ConstitutionDocument.id.desc()).first()
+    if doc:
+        uploaded = doc.uploaded_at.strftime('%d %B %Y') if doc.uploaded_at else ''
+        body = f'''<div class="wrap">
+        <div class="card">
+          <h1>Constitution</h1>
+          <p>Official Constitution of Greater Dhaka Association, Denmark.</p>
+          <p class="muted">Latest document uploaded: {html.escape(uploaded)}</p>
+          <p style="display:flex;gap:10px;flex-wrap:wrap">
+            <a class="btn" href="/constitution/document">📖 View Constitution</a>
+            <a class="btn alt" href="/constitution/document?download=1">⬇️ Download PDF</a>
+          </p>
+        </div>
+        </div>'''
+    else:
+        body = '''<div class="wrap"><div class="card"><h1>Constitution</h1>
+        <p>The association operates as a non-profit, non-political social, cultural and welfare organisation in accordance with applicable Danish law.</p>
+        <p>Its aims include community unity, cultural activities, language and heritage, welfare support, education, sports and mutual assistance.</p>
+        <p class="muted">The official PDF will appear here after it is uploaded by an administrator.</p>
+        </div></div>'''
+    return page('Constitution', body, description='The official constitution of Greater Dhaka Association, Denmark.')
+
+# Replace the original placeholder constitution view from app.py.
+app.view_functions['constitution'] = _constitution_page
+
+@app.route('/constitution/document')
+def constitution_document():
+    doc = ConstitutionDocument.query.order_by(ConstitutionDocument.uploaded_at.desc(), ConstitutionDocument.id.desc()).first_or_404()
+    return send_file(
+        io.BytesIO(doc.pdf_data),
+        as_attachment=(request.args.get('download') == '1'),
+        download_name=doc.filename,
+        mimetype=doc.mime_type or 'application/pdf'
+    )
+
+@app.route('/admin/constitution', methods=['GET','POST'])
+@_admin_required
+def admin_constitution():
+    if request.method == 'POST':
+        file = request.files.get('constitution')
+        if not file or not file.filename:
+            return page('Constitution Upload', '<div class="wrap"><div class="card"><p class="danger">Please choose the Constitution PDF first.</p><p><a href="/admin/constitution">Back</a></p></div></div>')
+        filename = file.filename.rsplit('/', 1)[-1].rsplit('\\', 1)[-1]
+        if not filename.lower().endswith('.pdf') or file.mimetype not in ('application/pdf', 'application/octet-stream'):
+            return page('Constitution Upload', '<div class="wrap"><div class="card"><p class="danger">Only PDF files are allowed.</p><p><a href="/admin/constitution">Back</a></p></div></div>')
+        data = file.read()
+        if len(data) > 15 * 1024 * 1024:
+            return page('Constitution Upload', '<div class="wrap"><div class="card"><p class="danger">Maximum PDF size is 15 MB.</p><p><a href="/admin/constitution">Back</a></p></div></div>')
+        # Keep previous versions in the database for safety. The newest upload is public.
+        db.session.add(ConstitutionDocument(filename=filename[:255], mime_type='application/pdf', pdf_data=data))
+        db.session.commit()
+        return redirect(url_for('admin_constitution'))
+
+    docs = ConstitutionDocument.query.order_by(ConstitutionDocument.uploaded_at.desc(), ConstitutionDocument.id.desc()).all()
+    history = ''.join(
+        f'<tr><td>{html.escape(d.filename)}</td><td>{d.uploaded_at:%d %B %Y, %H:%M}</td><td><a href="/constitution/document">View Latest</a></td></tr>'
+        for d in docs
+    ) or '<tr><td colspan="3" class="muted">No Constitution PDF has been uploaded yet.</td></tr>'
+    body = f'''<div class="wrap">
+      <div class="card">
+        <h1>Constitution</h1>
+        <p>Upload the official Constitution PDF here. The newest upload will automatically become the public Constitution shown from the Home-page menu.</p>
+        <form method="post" enctype="multipart/form-data">
+          <label>Constitution PDF</label>
+          <input type="file" name="constitution" accept="application/pdf,.pdf" required>
+          <button>Upload Constitution PDF</button>
+        </form>
+        <p><a href="/admin">← Back to Admin Dashboard</a> · <a href="/constitution">View Public Constitution</a></p>
+      </div>
+      <div class="card">
+        <h2>Upload History</h2>
+        <table><tr><th>File</th><th>Uploaded</th><th>Action</th></tr>{history}</table>
+        <p class="muted">Previous uploads are retained as database records; the latest upload is the active public version.</p>
+      </div>
+    </div>'''
+    return page('Constitution Upload', body)
+
+# Add Constitution + Upload shortcut to the existing Admin Dashboard without
+# removing any of its current tools.
+_original_admin_dashboard = app.view_functions.get('admin_dashboard')
+if _original_admin_dashboard:
+    def _admin_dashboard_with_constitution():
+        result = _original_admin_dashboard()
+        if isinstance(result, Response):
+            text = result.get_data(as_text=True)
+            injection = '''<div class="card" style="margin:16px 0"><h2>📜 Constitution</h2><p>Manage the official Constitution PDF.</p><p><a class="btn" href="/constitution">View Constitution</a> &nbsp; <a class="btn alt" href="/admin/constitution">Upload / Update Constitution PDF</a></p></div>'''
+            marker = '<h1>Admin Dashboard</h1>'
+            if marker in text and 'Upload / Update Constitution PDF' not in text:
+                text = text.replace(marker, marker + injection, 1)
+                result.set_data(text)
+            return result
+        text = str(result)
+        injection = '''<div class="card" style="margin:16px 0"><h2>📜 Constitution</h2><p>Manage the official Constitution PDF.</p><p><a class="btn" href="/constitution">View Constitution</a> &nbsp; <a class="btn alt" href="/admin/constitution">Upload / Update Constitution PDF</a></p></div>'''
+        if '<h1>Admin Dashboard</h1>' in text and 'Upload / Update Constitution PDF' not in text:
+            text = text.replace('<h1>Admin Dashboard</h1>', '<h1>Admin Dashboard</h1>' + injection, 1)
+        return text
+    app.view_functions['admin_dashboard'] = _admin_dashboard_with_constitution
 
 application = app
