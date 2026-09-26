@@ -396,10 +396,19 @@ def superadmin_recovery():
         recovery_key = request.form.get('recovery_key','')
         new_password = request.form.get('new_password','')
         confirm = request.form.get('confirm_password','')
-        configured_key = os.getenv('SUPERADMIN_RECOVERY_KEY','')
+        configured_key = os.getenv('SUPERADMIN_RECOVERY_KEY','').strip()
+        if not configured_key:
+            for recovery_path in ('/etc/secrets/superadmin_recovery_key.txt', '/etc/secrets/SUPERADMIN_RECOVERY_KEY'):
+                try:
+                    with open(recovery_path, 'r', encoding='utf-8') as recovery_file:
+                        configured_key = recovery_file.read().strip()
+                    if configured_key:
+                        break
+                except (FileNotFoundError, OSError):
+                    pass
         admin = AdminUser.query.filter_by(username=username, role='superadmin').first()
         if not configured_key or not admin:
-            return page('Super Admin Recovery','<div class="wrap"><div class="card"><p class="danger">Recovery details are not valid.</p><p><a href="/admin/superadmin-recovery">Try again</a></p></div></div>')
+            return page('Super Admin Recovery','<div class="wrap"><div class="card"><p class="danger">Recovery details are not configured or are not valid.</p><p><a href="/admin/superadmin-recovery">Try again</a></p></div></div>')
         if not secrets.compare_digest(recovery_key, configured_key):
             return page('Super Admin Recovery','<div class="wrap"><div class="card"><p class="danger">Recovery key is incorrect.</p><p><a href="/admin/superadmin-recovery">Try again</a></p></div></div>')
         if len(new_password) < 8:
