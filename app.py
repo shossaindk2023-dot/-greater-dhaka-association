@@ -86,6 +86,14 @@ class GalleryItem(db.Model):
     image_data = db.Column(db.LargeBinary, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+class ConstitutionDocument(db.Model):
+    __tablename__ = 'constitution_documents'
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(255), nullable=False)
+    mime_type = db.Column(db.String(100), nullable=False, default='application/pdf')
+    pdf_data = db.Column(db.LargeBinary, nullable=False)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
 def setting(key, default=''):
     x = Setting.query.filter_by(key=key).first()
     return x.value if x else default
@@ -281,7 +289,56 @@ def home():
 def about(): return page('About','''<div class="wrap"><div class="card"><h1>About GDA Denmark</h1><p>Greater Dhaka Association, Denmark was established in 2026. The association aims to promote harmony, Bangladeshi culture and community welfare.</p><p><b>Motto:</b> Harmony, Culture and Welfare</p><p><b>বাংলা:</b> সম্প্রীতি, সংস্কৃতি ও কল্যাণ</p></div></div>''', description='Learn about Greater Dhaka Association, Denmark, established in 2026 to promote harmony, Bangladeshi culture and community welfare.')
 
 @app.route('/constitution')
-def constitution(): return page('Constitution','''<div class="wrap"><div class="card"><h1>Constitution</h1><p>The association operates as a non-profit, non-political social, cultural and welfare organisation in accordance with applicable Danish law.</p><p>Its aims include community unity, cultural activities, language and heritage, welfare support, education, sports and mutual assistance.</p></div></div>''', description='The constitution and aims of Greater Dhaka Association, Denmark, a non-profit and non-political community association.')
+def constitution():
+    doc = ConstitutionDocument.query.order_by(ConstitutionDocument.uploaded_at.desc(), ConstitutionDocument.id.desc()).first()
+    if doc:
+        uploaded = doc.uploaded_at.strftime('%d %B %Y') if doc.uploaded_at else ''
+        body = f'''<div class="wrap"><div class="card"><h1>Constitution</h1>
+        <p>Official Constitution of Greater Dhaka Association, Denmark.</p>
+        <p class="muted">Latest document uploaded: {html.escape(uploaded)}</p>
+        <p style="display:flex;gap:10px;flex-wrap:wrap">
+          <a class="btn" href="/constitution/document">📖 View Constitution</a>
+          <a class="btn alt" href="/constitution/document?download=1">⬇️ Download PDF</a>
+        </p></div></div>'''
+    else:
+        body = '''<div class="wrap"><div class="card"><h1>Constitution</h1>
+        <p>The association operates as a non-profit, non-political social, cultural and welfare organisation in accordance with applicable Danish law.</p>
+        <p>Its aims include community unity, cultural activities, language and heritage, welfare support, education, sports and mutual assistance.</p>
+        <p class="muted">The official PDF will appear here after it is uploaded by an administrator.</p>
+        </div></div>'''
+    return page('Constitution', body, description='The official constitution of Greater Dhaka Association, Denmark.')
+
+@app.route('/constitution/document')
+def constitution_document():
+    doc = ConstitutionDocument.query.order_by(ConstitutionDocument.uploaded_at.desc(), ConstitutionDocument.id.desc()).first_or_404()
+    return send_file(io.BytesIO(doc.pdf_data), as_attachment=(request.args.get('download') == '1'), download_name=doc.filename, mimetype=doc.mime_type or 'application/pdf')
+
+@app.route('/admin/constitution', methods=['GET','POST'])
+@admin_required
+def admin_constitution():
+    if request.method == 'POST':
+        file = request.files.get('constitution')
+        if not file or not file.filename:
+            return page('Constitution Upload','<div class="wrap"><div class="card"><p class="danger">Please choose the Constitution PDF first.</p><p><a href="/admin/constitution">Back</a></p></div></div>')
+        filename = file.filename.rsplit('/',1)[-1].rsplit('\\',1)[-1]
+        if not filename.lower().endswith('.pdf') or file.mimetype not in ('application/pdf','application/octet-stream'):
+            return page('Constitution Upload','<div class="wrap"><div class="card"><p class="danger">Only PDF files are allowed.</p><p><a href="/admin/constitution">Back</a></p></div></div>')
+        data = file.read()
+        if len(data) > 15*1024*1024:
+            return page('Constitution Upload','<div class="wrap"><div class="card"><p class="danger">Maximum PDF size is 15 MB.</p><p><a href="/admin/constitution">Back</a></p></div></div>')
+        db.session.add(ConstitutionDocument(filename=filename[:255], mime_type='application/pdf', pdf_data=data))
+        db.session.commit()
+        return redirect(url_for('admin_constitution'))
+    docs = ConstitutionDocument.query.order_by(ConstitutionDocument.uploaded_at.desc(), ConstitutionDocument.id.desc()).all()
+    history = ''.join(f'<tr><td>{html.escape(d.filename)}</td><td>{d.uploaded_at:%d %B %Y, %H:%M}</td><td><a href="/constitution/document">View Latest</a></td></tr>' for d in docs) or '<tr><td colspan="3" class="muted">No Constitution PDF has been uploaded yet.</td></tr>'
+    body = f'''<div class="wrap"><div class="card"><h1>Constitution</h1>
+    <p>Upload the official Constitution PDF here. The newest upload automatically becomes the public Constitution.</p>
+    <form method="post" enctype="multipart/form-data"><label>Constitution PDF</label>
+    <input type="file" name="constitution" accept="application/pdf,.pdf" required><button>Upload Constitution PDF</button></form>
+    <p><a href="/admin">← Back to Admin Dashboard</a> · <a href="/constitution">View Public Constitution</a></p></div>
+    <div class="card"><h2>Upload History</h2><table><tr><th>File</th><th>Uploaded</th><th>Action</th></tr>{history}</table>
+    <p class="muted">Previous uploads are retained for safety; the latest upload is public.</p></div></div>'''
+    return page('Constitution Upload', body)
 
 @app.route('/committee')
 def committee():
@@ -433,7 +490,7 @@ def admin_dashboard():
     admin=current_admin()
     user_link = '<a href="/admin/users">Admin Users</a> · ' if admin and admin.role == 'superadmin' else ''
     links = user_link + '<a href="/admin/manage">Member Management</a> · <a href="/approved-members">Approved Members</a> · <a href="/admin/gallery">Gallery</a> · <a href="/admin/change-password">Change Password</a> · <a href="/admin/settings">Website Settings</a> · <a href="/admin/news">News</a> · <a href="/admin/committee">Committee</a> · <a href="/admin/messages">Messages</a> · <a href="/admin/logout">Logout</a>'
-    body = '<div class="wrap"><div class="card"><h1>Admin Dashboard</h1><p>' + links + '</p></div><div class="card"><h2>Members</h2><table><tr><th>Name</th><th>Application</th><th>Status</th><th>Fee</th><th>Action</th></tr>' + rows + '</table></div></div>'
+    body = '<div class="wrap"><div class="card"><h1>Admin Dashboard</h1><div class="card" style="margin:16px 0;padding:18px"><h2>📜 Constitution</h2><p>Manage the official Constitution PDF.</p><p><a class="btn" href="/constitution">View Constitution</a> &nbsp; <a class="btn alt" href="/admin/constitution">Upload / Update Constitution PDF</a></p></div><p>' + links + '</p></div><div class="card"><h2>Members</h2><table><tr><th>Name</th><th>Application</th><th>Status</th><th>Fee</th><th>Action</th></tr>' + rows + '</table></div></div>'
     return page('Admin Dashboard', body)
 
 @app.route('/admin/change-password',methods=['GET','POST'])
