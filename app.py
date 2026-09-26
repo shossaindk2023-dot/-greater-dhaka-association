@@ -386,8 +386,32 @@ def admin_login():
             session['admin_role']=admin.role
             return redirect(url_for('admin_dashboard'))
         return page('Admin Login','<div class="wrap"><div class="card"><p class="danger">Invalid username or password.</p></div></div>')
-    body = '<div class="wrap"><div class="card"><h1>Admin Login</h1><p class="muted">Each administrator can use their own account.</p><form method="post"><input name="username" placeholder="Username" required><div class="pw-wrap"><input id="login-password" type="password" name="password" placeholder="Password" required><button type="button" class="pw-toggle" onclick="togglePassword(&quot;login-password&quot;,this)">Show password</button></div><button>Login</button></form></div></div>'
+    body = '<div class="wrap"><div class="card"><h1>Admin Login</h1><p class="muted">Each administrator can use their own account.</p><form method="post"><input name="username" placeholder="Username" required><div class="pw-wrap"><input id="login-password" type="password" name="password" placeholder="Password" required><button type="button" class="pw-toggle" onclick="togglePassword(&quot;login-password&quot;,this)">Show password</button></div><button>Login</button></form><p style="margin-top:18px"><a href="/admin/superadmin-recovery">Forgot Super Admin password?</a></p></div></div>'
     return page('Admin Login', body)
+
+@app.route('/admin/superadmin-recovery', methods=['GET','POST'])
+def superadmin_recovery():
+    if request.method == 'POST':
+        username = request.form.get('username','').strip()
+        recovery_key = request.form.get('recovery_key','')
+        new_password = request.form.get('new_password','')
+        confirm = request.form.get('confirm_password','')
+        configured_key = os.getenv('SUPERADMIN_RECOVERY_KEY','')
+        admin = AdminUser.query.filter_by(username=username, role='superadmin').first()
+        if not configured_key or not admin:
+            return page('Super Admin Recovery','<div class="wrap"><div class="card"><p class="danger">Recovery details are not valid.</p><p><a href="/admin/superadmin-recovery">Try again</a></p></div></div>')
+        if not secrets.compare_digest(recovery_key, configured_key):
+            return page('Super Admin Recovery','<div class="wrap"><div class="card"><p class="danger">Recovery key is incorrect.</p><p><a href="/admin/superadmin-recovery">Try again</a></p></div></div>')
+        if len(new_password) < 8:
+            return page('Super Admin Recovery','<div class="wrap"><div class="card"><p class="danger">New password must be at least 8 characters.</p><p><a href="/admin/superadmin-recovery">Try again</a></p></div></div>')
+        if new_password != confirm:
+            return page('Super Admin Recovery','<div class="wrap"><div class="card"><p class="danger">New passwords do not match.</p><p><a href="/admin/superadmin-recovery">Try again</a></p></div></div>')
+        admin.password_hash = generate_password_hash(new_password)
+        admin.active = True
+        db.session.commit()
+        return page('Password Reset','<div class="wrap"><div class="card"><h1>Super Admin Password Reset</h1><p>The Super Admin password has been reset successfully.</p><p><a class="btn" href="/admin/login">Go to Admin Login</a></p></div></div>')
+    body = '<div class="wrap"><div class="card"><h1>Super Admin Recovery</h1><p class="muted">No email is required. Enter the Super Admin username and the private Recovery Key stored in the Render Environment settings.</p><form method="post"><label>Super Admin Username</label><input name="username" required><label>Recovery Key</label><div class="pw-wrap"><input id="recovery-key" type="password" name="recovery_key" required><button type="button" class="pw-toggle" onclick="togglePassword(&quot;recovery-key&quot;,this)">Show key</button></div><label>New Password</label><div class="pw-wrap"><input id="recovery-new-password" type="password" name="new_password" minlength="8" required><button type="button" class="pw-toggle" onclick="togglePassword(&quot;recovery-new-password&quot;,this)">Show password</button></div><label>Confirm New Password</label><div class="pw-wrap"><input id="recovery-confirm-password" type="password" name="confirm_password" minlength="8" required><button type="button" class="pw-toggle" onclick="togglePassword(&quot;recovery-confirm-password&quot;,this)">Show password</button></div><button>Reset Super Admin Password</button></form><p style="margin-top:18px"><a href="/admin/login">Back to Admin Login</a></p></div></div>'
+    return page('Super Admin Recovery', body)
 
 @app.route('/admin/logout')
 def admin_logout(): session.clear(); return redirect(url_for('home'))
