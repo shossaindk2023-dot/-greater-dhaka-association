@@ -1,4 +1,4 @@
-import os, secrets, io, html
+import os, secrets, io, html, json, base64
 from datetime import datetime
 from functools import wraps
 from flask import Flask, request, redirect, url_for, session, render_template_string, send_file, abort
@@ -490,8 +490,42 @@ def admin_dashboard():
     admin=current_admin()
     user_link = '<a href="/admin/users">Admin Users</a> · ' if admin and admin.role == 'superadmin' else ''
     links = user_link + '<a href="/admin/manage">Member Management</a> · <a href="/approved-members">Approved Members</a> · <a href="/admin/gallery">Gallery</a> · <a href="/admin/change-password">Change Password</a> · <a href="/admin/settings">Website Settings</a> · <a href="/admin/news">News</a> · <a href="/admin/committee">Committee</a> · <a href="/admin/messages">Messages</a> · <a href="/admin/logout">Logout</a>'
-    body = '<div class="wrap"><div class="card"><h1>Admin Dashboard</h1><div class="card" style="margin:16px 0;padding:18px"><h2>📜 Constitution</h2><p>Manage the official Constitution PDF.</p><p><a class="btn" href="/constitution">View Constitution</a> &nbsp; <a class="btn alt" href="/admin/constitution">Upload / Update Constitution PDF</a></p></div><p>' + links + '</p></div><div class="card"><h2>Members</h2><table><tr><th>Name</th><th>Application</th><th>Status</th><th>Fee</th><th>Action</th></tr>' + rows + '</table></div></div>'
+    body = '<div class="wrap"><div class="card"><h1>Admin Dashboard</h1><div class="card" style="margin:16px 0;padding:18px"><h2>📜 Constitution</h2><p>Manage the official Constitution PDF.</p><p><a class="btn" href="/constitution">View Constitution</a> &nbsp; <a class="btn alt" href="/admin/constitution">Upload / Update Constitution PDF</a></p></div><div class="card" style="margin:16px 0;padding:18px"><h2>🔐 Data Backup</h2><p>Download a complete copy of the GDA database, including members, settings, news, committee, gallery photos and Constitution files.</p><p><a class="btn" href="/admin/backup">Download Database Backup</a></p><p class="muted">Keep the backup in a secure private location. It contains sensitive association data.</p></div><p>' + links + '</p></div><div class="card"><h2>Members</h2><table><tr><th>Name</th><th>Application</th><th>Status</th><th>Fee</th><th>Action</th></tr>' + rows + '</table></div></div>'
     return page('Admin Dashboard', body)
+
+
+@app.route('/admin/backup')
+@superadmin_required
+def admin_backup():
+    """Create a complete database backup for the Super Admin to download."""
+    def encode_value(value):
+        if isinstance(value, bytes):
+            return {'__type__': 'base64', 'value': base64.b64encode(value).decode('ascii')}
+        if isinstance(value, datetime):
+            return {'__type__': 'datetime', 'value': value.isoformat()}
+        return value
+
+    backup = {
+        'format': 'GDA Denmark database backup v1',
+        'created_at': datetime.utcnow().isoformat() + 'Z',
+        'database_backend': 'postgres' if db_url.startswith('postgresql://') else 'sqlite',
+        'tables': {}
+    }
+    for table in db.metadata.sorted_tables:
+        rows = db.session.execute(table.select()).mappings().all()
+        backup['tables'][table.name] = [
+            {str(k): encode_value(v) for k, v in row.items()} for row in rows
+        ]
+
+    payload = json.dumps(backup, ensure_ascii=False, indent=2).encode('utf-8')
+    buf = io.BytesIO(payload)
+    filename = f'GDA_Denmark_Backup_{datetime.utcnow():%Y-%m-%d_%H-%M-%S}.json'
+    return send_file(
+        buf,
+        as_attachment=True,
+        download_name=filename,
+        mimetype='application/json'
+    )
 
 @app.route('/admin/change-password',methods=['GET','POST'])
 @admin_required
