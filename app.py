@@ -5,6 +5,7 @@ from flask import Flask, request, redirect, url_for, session, render_template_st
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A6, A4
 from reportlab.lib import colors
@@ -23,7 +24,7 @@ if db_url.startswith('postgresql://') and 'sslmode=' not in db_url:
     db_url += ('&' if '?' in db_url else '?') + 'sslmode=require'
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024
 db = SQLAlchemy(app)
 
 class AdminUser(db.Model):
@@ -490,7 +491,7 @@ def admin_dashboard():
     admin=current_admin()
     user_link = '<a href="/admin/users">Admin Users</a> · ' if admin and admin.role == 'superadmin' else ''
     links = user_link + '<a href="/admin/manage">Member Management</a> · <a href="/approved-members">Approved Members</a> · <a href="/admin/gallery">Gallery</a> · <a href="/admin/change-password">Change Password</a> · <a href="/admin/settings">Website Settings</a> · <a href="/admin/news">News</a> · <a href="/admin/committee">Committee</a> · <a href="/admin/messages">Messages</a> · <a href="/admin/logout">Logout</a>'
-    body = '<div class="wrap"><div class="card"><h1>Admin Dashboard</h1><div class="card" style="margin:16px 0;padding:18px"><h2>📜 Constitution</h2><p>Manage the official Constitution PDF.</p><p><a class="btn" href="/constitution">View Constitution</a> &nbsp; <a class="btn alt" href="/admin/constitution">Upload / Update Constitution PDF</a></p></div><div class="card" style="margin:16px 0;padding:18px"><h2>🔐 Data Backup</h2><p>Download a complete copy of the GDA database, including members, settings, news, committee, gallery photos and Constitution files.</p><p><a class="btn" href="/admin/backup">Download Database Backup</a></p><p class="muted">Keep the backup in a secure private location. It contains sensitive association data.</p></div><p>' + links + '</p></div><div class="card"><h2>Members</h2><table><tr><th>Name</th><th>Application</th><th>Status</th><th>Fee</th><th>Action</th></tr>' + rows + '</table></div></div>'
+    body = '<div class="wrap"><div class="card"><h1>Admin Dashboard</h1><div class="card" style="margin:16px 0;padding:18px"><h2>📜 Constitution</h2><p>Manage the official Constitution PDF.</p><p><a class="btn" href="/constitution">View Constitution</a> &nbsp; <a class="btn alt" href="/admin/constitution">Upload / Update Constitution PDF</a></p></div><div class="card" style="margin:16px 0;padding:18px"><h2>🔐 Data Backup &amp; Restore</h2><p>Keep both backups: the JSON file is the real restore backup; the PDF is a human-readable reference.</p><p><a class="btn" href="/admin/backup">⬇️ Full Database Backup (JSON)</a> &nbsp; <a class="btn alt" href="/admin/backup-readable">📄 Readable Backup (PDF)</a></p><p><a class="btn alt" href="/admin/restore">♻️ Restore Database from JSON</a></p><p class="muted">Restore is Super Admin only and requires typing RESTORE GDA. Keep the JSON backup in a secure private location.</p></div><p>' + links + '</p></div><div class="card"><h2>Members</h2><table><tr><th>Name</th><th>Application</th><th>Status</th><th>Fee</th><th>Action</th></tr>' + rows + '</table></div></div>'
     return page('Admin Dashboard', body)
 
 
@@ -526,6 +527,164 @@ def admin_backup():
         download_name=filename,
         mimetype='application/json'
     )
+
+
+@app.route('/admin/backup-readable')
+@superadmin_required
+def admin_backup_readable():
+    """Create a human-readable PDF backup for the Super Admin."""
+    members = Member.query.order_by(Member.name.asc()).all()
+    committee = Committee.query.order_by(Committee.sort_order, Committee.id).all()
+    news_rows = News.query.order_by(News.created_at.desc()).all()
+    settings = Setting.query.order_by(Setting.key.asc()).all()
+    admins = AdminUser.query.order_by(AdminUser.username.asc()).all()
+    messages = Message.query.order_by(Message.created_at.desc()).all()
+    gallery = GalleryItem.query.order_by(GalleryItem.created_at.desc()).all()
+    constitutions = ConstitutionDocument.query.order_by(ConstitutionDocument.uploaded_at.desc(), ConstitutionDocument.id.desc()).all()
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=28, leftMargin=28, topMargin=30, bottomMargin=30)
+    styles = getSampleStyleSheet()
+    title = styles['Title']; title.alignment = TA_CENTER
+    small = styles['Normal']; small.fontSize = 8
+    story = [
+        Paragraph('Greater Dhaka Association, Denmark', title),
+        Paragraph('Human-Readable Data Backup', styles['Heading2']),
+        Paragraph('Generated: ' + datetime.utcnow().strftime('%d %B %Y, %H:%M UTC'), small),
+        Spacer(1, 12)
+    ]
+
+    def safe(v):
+        return html.escape(str(v or ''))
+
+    def add_section(title_text, headers, rows, widths):
+        story.append(Paragraph(title_text, styles['Heading2']))
+        if not rows:
+            story.append(Paragraph('No records.', small))
+            story.append(Spacer(1, 8))
+            return
+        data = [headers] + rows
+        tbl = Table(data, colWidths=widths, repeatRows=1)
+        tbl.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#0b3768')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,-1), 7),
+            ('GRID', (0,0), (-1,-1), 0.35, colors.HexColor('#cbd7e4')),
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#f4f8fc')]),
+            ('TOPPADDING', (0,0), (-1,-1), 5),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+        ]))
+        story.append(tbl)
+        story.append(Spacer(1, 10))
+
+    add_section('Members', ['No.','Name','Application','Membership','Status','Fee','Email','Phone'],
+        [[str(i), safe(m.name), safe(m.application_code), safe(m.membership_number), safe(m.status), safe(m.fee_status), safe(m.email), safe(m.phone)] for i,m in enumerate(members,1)],
+        [22,90,75,70,48,42,100,70])
+    add_section('Committee', ['No.','Name','Position','Bio'],
+        [[str(i), safe(x.name), safe(x.position), safe(x.bio)] for i,x in enumerate(committee,1)],
+        [25,100,100,280])
+    add_section('News & Events', ['Date','Title','Body'],
+        [[x.created_at.strftime('%d %b %Y') if x.created_at else '', safe(x.title), safe(x.body)] for x in news_rows],
+        [70,140,295])
+    add_section('Website Settings', ['Key','Value'],
+        [[safe(x.key), safe(x.value)] for x in settings],
+        [150,355])
+    add_section('Admin Accounts', ['Username','Role','Status','Created'],
+        [[safe(x.username), safe(x.role), 'Active' if x.active else 'Inactive', x.created_at.strftime('%d %b %Y') if x.created_at else ''] for x in admins],
+        [120,90,90,105])
+    add_section('Contact Messages', ['Date','Name','Email','Message','Status'],
+        [[x.created_at.strftime('%d %b %Y') if x.created_at else '', safe(x.name), safe(x.email), safe(x.message), safe(x.status)] for x in messages],
+        [65,85,105,220,60])
+    add_section('Gallery', ['No.','Filename','Caption','Uploaded'],
+        [[str(i), safe(x.filename), safe(x.caption), x.created_at.strftime('%d %b %Y') if x.created_at else ''] for i,x in enumerate(gallery,1)],
+        [25,180,190,90])
+    add_section('Constitution Documents', ['No.','Filename','Uploaded'],
+        [[str(i), safe(x.filename), x.uploaded_at.strftime('%d %b %Y, %H:%M') if x.uploaded_at else ''] for i,x in enumerate(constitutions,1)],
+        [25,270,190])
+    story.append(Paragraph('Note: This PDF is for human reference. The JSON database backup is the backup used for restoring the actual database, including photos and PDF files.', small))
+    doc.build(story)
+    buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name='GDA_Denmark_Readable_Backup.pdf', mimetype='application/pdf')
+
+@app.route('/admin/restore', methods=['GET','POST'])
+@superadmin_required
+def admin_restore():
+    if request.method == 'POST':
+        file = request.files.get('backup')
+        confirm = request.form.get('confirm','').strip()
+        if confirm != 'RESTORE GDA':
+            return page('Restore Database','<div class="wrap"><div class="card"><p class="danger">Please type RESTORE GDA exactly to confirm.</p><p><a href="/admin/restore">Back</a></p></div></div>')
+        if not file or not file.filename:
+            return page('Restore Database','<div class="wrap"><div class="card"><p class="danger">Please choose the JSON database backup file.</p><p><a href="/admin/restore">Back</a></p></div></div>')
+        try:
+            payload = json.loads(file.read().decode('utf-8'))
+            if payload.get('format') != 'GDA Denmark database backup v1':
+                raise ValueError('Unsupported backup format.')
+            tables = payload.get('tables')
+            if not isinstance(tables, dict) or not tables:
+                raise ValueError('Backup contains no tables.')
+            known = {t.name: t for t in db.metadata.sorted_tables}
+            prepared = {}
+            for name, rows in tables.items():
+                if name not in known or not isinstance(rows, list):
+                    continue
+                columns = {c.name for c in known[name].columns}
+                out = []
+                for row in rows:
+                    if not isinstance(row, dict):
+                        raise ValueError('Invalid row in ' + name)
+                    item = {}
+                    for key, value in row.items():
+                        if key not in columns:
+                            continue
+                        if isinstance(value, dict) and value.get('__type__') == 'base64':
+                            item[key] = base64.b64decode(value.get('value',''), validate=True)
+                        elif isinstance(value, dict) and value.get('__type__') == 'datetime':
+                            item[key] = datetime.fromisoformat(value.get('value',''))
+                        else:
+                            item[key] = value
+                    out.append(item)
+                prepared[name] = out
+
+            # Restore atomically: either the whole backup is restored or nothing is changed.
+            with db.session.begin_nested():
+                for table in reversed(db.metadata.sorted_tables):
+                    db.session.execute(table.delete())
+                for table in db.metadata.sorted_tables:
+                    rows = prepared.get(table.name, [])
+                    if rows:
+                        db.session.execute(table.insert(), rows)
+
+                if db_url.startswith('postgresql://'):
+                    for table in db.metadata.sorted_tables:
+                        if 'id' in table.c:
+                            seq_sql = f'SELECT setval(pg_get_serial_sequence(\'{table.name}\', \'id\'), COALESCE(MAX(id), 1), MAX(id) IS NOT NULL) FROM "{table.name}"'
+                            try:
+                                db.session.execute(text(seq_sql))
+                            except Exception:
+                                pass
+                db.session.commit()
+
+            session.clear()
+            return page('Database Restored','<div class="wrap"><div class="card"><h1>Database Restored Successfully</h1><p>The GDA database has been restored from the uploaded backup.</p><p>For security, your admin session was logged out. Please log in again.</p><p><a class="btn" href="/admin/login">Go to Admin Login</a></p></div></div>')
+        except Exception as exc:
+            db.session.rollback()
+            return page('Restore Failed','<div class="wrap"><div class="card"><h1>Restore Failed</h1><p class="danger">The backup was not restored.</p><p class="muted">' + html.escape(str(exc)) + '</p><p><a href="/admin/restore">Try again</a></p></div></div>')
+
+    body = '''<div class="wrap"><div class="card"><h1>Restore Database</h1>
+    <p><strong>Important:</strong> This will replace the current GDA database with the uploaded JSON backup.</p>
+    <p>Use this only if data has been lost or the database has been recreated. The backup should be a file downloaded from <b>Download Database Backup</b>.</p>
+    <form method="post" enctype="multipart/form-data">
+      <label>JSON Database Backup</label>
+      <input type="file" name="backup" accept=".json,application/json" required>
+      <label>Type <b>RESTORE GDA</b> to confirm</label>
+      <input name="confirm" placeholder="RESTORE GDA" required>
+      <button style="background:#a32222">Restore Database</button>
+    </form>
+    <p><a href="/admin">← Back to Admin Dashboard</a></p></div></div>'''
+    return page('Restore Database', body)
 
 @app.route('/admin/change-password',methods=['GET','POST'])
 @admin_required
