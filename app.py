@@ -258,7 +258,7 @@ with app.app_context():
         db.session.add(AdminUser(username=seed_user, password_hash=generate_password_hash(seed_password), role='superadmin', active=True))
         db.session.commit()
     if not Setting.query.filter_by(key='fee_amount').first():
-        for k in ['fee_amount','bank_name','iban','mobilepay','contact_email','contact_phone']:
+        for k in ['fee_amount','bank_name','iban','mobilepay','payment_instructions','site_name','site_tagline','contact_email','contact_phone','address','facebook','website_description']:
             set_setting(k, '')
         db.session.commit()
 
@@ -491,7 +491,7 @@ def admin_dashboard():
     admin=current_admin()
     user_link = '<a href="/admin/users">Admin Users</a> · ' if admin and admin.role == 'superadmin' else ''
     links = user_link + '<a href="/admin/manage">Member Management</a> · <a href="/approved-members">Approved Members</a> · <a href="/admin/gallery">Gallery</a> · <a href="/admin/change-password">Change Password</a> · <a href="/admin/settings">Website Settings</a> · <a href="/admin/news">News</a> · <a href="/admin/committee">Committee</a> · <a href="/admin/messages">Messages</a> · <a href="/admin/logout">Logout</a>'
-    body = '<div class="wrap"><div class="card"><h1>Admin Dashboard</h1><div class="card" style="margin:16px 0;padding:18px"><h2>📜 Constitution</h2><p>Manage the official Constitution PDF.</p><p><a class="btn" href="/constitution">View Constitution</a> &nbsp; <a class="btn alt" href="/admin/constitution">Upload / Update Constitution PDF</a></p></div><div class="card" style="margin:16px 0;padding:18px"><h2>🔐 Data Backup &amp; Restore</h2><p>Keep both backups: the JSON file is the real restore backup; the PDF is a human-readable reference.</p><p><a class="btn" href="/admin/backup">⬇️ Full Database Backup (JSON)</a> &nbsp; <a class="btn alt" href="/admin/backup-readable">📄 Readable Backup (PDF)</a></p><p><a class="btn alt" href="/admin/restore">♻️ Restore Database from JSON</a></p><p class="muted">Restore is Super Admin only and requires typing RESTORE GDA. Keep the JSON backup in a secure private location.</p></div><p>' + links + '</p></div><div class="card"><h2>Members</h2><table><tr><th>Name</th><th>Application</th><th>Status</th><th>Fee</th><th>Action</th></tr>' + rows + '</table></div></div>'
+    body = '<div class="wrap"><p>' + links + '</p></div><div class="card"><h2>Members</h2><table><tr><th>Name</th><th>Application</th><th>Status</th><th>Fee</th><th>Action</th></tr>' + rows + '</table></div></div>'
     return page('Admin Dashboard', body)
 
 
@@ -810,12 +810,70 @@ def delete_gallery(item_id):
 @app.route('/admin/settings',methods=['GET','POST'])
 @admin_required
 def admin_settings():
-    keys=['fee_amount','bank_name','iban','mobilepay','contact_email','contact_phone']
+    keys=['site_name','site_tagline','contact_email','contact_phone','address','facebook','website_description']
     if request.method=='POST':
-        for k in keys: set_setting(k,request.form.get(k,''))
-        db.session.commit(); return redirect(url_for('admin_settings'))
-    fields=''.join(f'<label>{k.replace("_"," ").title()}</label><input name="{k}" value="{setting(k)}">' for k in keys)
-    return page('Website Settings',f'<div class="wrap"><div class="card"><h1>Website Settings</h1><form method="post">{fields}<button>Save Settings</button></form></div></div>')
+        for k in keys:
+            set_setting(k,request.form.get(k,'').strip())
+        db.session.commit()
+        return redirect(url_for('admin_settings'))
+    labels={
+        'site_name':'Website / Association Name',
+        'site_tagline':'Tagline / Motto',
+        'contact_email':'Public Contact Email',
+        'contact_phone':'Public Contact Phone',
+        'address':'Association Address',
+        'facebook':'Facebook / Social Media Link',
+        'website_description':'Website Description'
+    }
+    fields=''.join(f'<label>{labels[k]}</label><textarea name="{k}" rows="2">{html.escape(setting(k))}</textarea>' if k in ('address','website_description') else f'<label>{labels[k]}</label><input name="{k}" value="{html.escape(setting(k))}">' for k in keys)
+    body=f'''<div class="wrap">
+      <div class="card">
+        <h1>⚙️ Website Settings</h1>
+        <p class="muted">Manage the public website identity, contact details and general information. Membership payment details are kept separately.</p>
+        <form method="post">{fields}<button>Save Website Settings</button></form>
+      </div>
+      <div class="card">
+        <h2>🛠️ System & Data Management</h2>
+        <p class="muted">Database backup and restore tools are available to Super Admin only.</p>
+        <p><a class="btn" href="/admin/backup">⬇️ Full Database Backup (JSON)</a>
+           <a class="btn alt" href="/admin/backup-readable">📄 Readable Backup (PDF)</a>
+           <a class="btn alt" href="/admin/restore">♻️ Restore Database</a></p>
+        <p class="muted">Keep database backups in a secure private location. They contain sensitive association data.</p>
+      </div>
+      <div class="card">
+        <h2>💳 Membership & Payment</h2>
+        <p class="muted">Membership fee and bank/MobilePay information are managed on the dedicated payment settings page.</p>
+        <p><a class="btn alt" href="/admin/membership-payment">Open Membership & Payment Settings →</a></p>
+      </div>
+    </div>'''
+    return page('Website Settings', body)
+
+@app.route('/admin/membership-payment',methods=['GET','POST'])
+@admin_required
+def admin_membership_payment():
+    keys=['fee_amount','bank_name','iban','mobilepay','payment_instructions']
+    if request.method=='POST':
+        for k in keys:
+            set_setting(k,request.form.get(k,'').strip())
+        db.session.commit()
+        return redirect(url_for('admin_membership_payment'))
+    labels={
+        'fee_amount':'Membership Fee Amount',
+        'bank_name':'Bank Name',
+        'iban':'IBAN',
+        'mobilepay':'MobilePay Number',
+        'payment_instructions':'Payment Instructions'
+    }
+    fields=''.join(f'<label>{labels[k]}</label><textarea name="{k}" rows="3">{html.escape(setting(k))}</textarea>' if k == 'payment_instructions' else f'<label>{labels[k]}</label><input name="{k}" value="{html.escape(setting(k))}">' for k in keys)
+    body=f'''<div class="wrap">
+      <div class="card">
+        <h1>💳 Membership & Payment Settings</h1>
+        <p class="muted">These details are shown on the public Membership Fee page. Keep bank and payment information accurate before saving.</p>
+        <form method="post">{fields}<button>Save Membership & Payment Settings</button></form>
+        <p style="margin-top:18px"><a href="/membership-fee">View Public Membership Fee Page →</a> · <a href="/admin/settings">← Website Settings</a></p>
+      </div>
+    </div>'''
+    return page('Membership & Payment Settings', body)
 
 @app.route('/admin/news',methods=['GET','POST'])
 @admin_required
