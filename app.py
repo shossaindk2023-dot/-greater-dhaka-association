@@ -403,12 +403,95 @@ def member_card(membership_number):
 def gallery():
     items=GalleryItem.query.order_by(GalleryItem.created_at.desc()).all()
     cards=''
-    for x in items:
+    for idx, x in enumerate(items):
         cap=html.escape(x.caption or '')
-        cards += f'<div class="card" style="padding:10px"><img src="/gallery/image/{x.id}" alt="{cap}" style="width:100%;height:240px;object-fit:cover;border-radius:12px"><div style="padding:10px 5px"><b>{cap}</b></div></div>'
+        cards += f'''<div class="card gallery-card" style="padding:10px">
+          <button type="button" class="gallery-thumb" onclick="openGallery({idx})" aria-label="Open {cap}">
+            <img src="/gallery/image/{x.id}" alt="{cap}" loading="lazy">
+          </button>
+          <div style="padding:10px 5px"><b>{cap}</b></div>
+        </div>'''
     if not cards:
         cards='<div class="card"><p class="muted">No gallery photos have been published yet.</p></div>'
-    return page('Gallery',f'<div class="wrap"><div class="section-head"><div><h2>Gallery</h2><p>Photos and memories from Greater Dhaka Association, Denmark.</p></div></div><div class="cards">{cards}</div></div>', description='Gallery of Greater Dhaka Association, Denmark activities and community events.')
+    gallery_data=''.join(f'<button type="button" class="gallery-hidden-item" data-src="/gallery/image/{x.id}" data-caption="{html.escape(x.caption or "", quote=True)}"></button>' for x in items)
+    overlay=f'''<div id="gallery-lightbox" class="gallery-lightbox" aria-hidden="true">
+      <button class="gallery-close" type="button" onclick="closeGallery()" aria-label="Close">×</button>
+      <button class="gallery-prev" type="button" onclick="galleryMove(-1)" aria-label="Previous photo">‹</button>
+      <div class="gallery-view">
+        <img id="gallery-full-image" src="" alt="">
+        <div id="gallery-caption"></div>
+        <div class="gallery-counter"></div>
+      </div>
+      <button class="gallery-next" type="button" onclick="galleryMove(1)" aria-label="Next photo">›</button>
+    </div>
+    <script>
+    const galleryPhotos = Array.from(document.querySelectorAll('.gallery-hidden-item')).map(el => ({src: el.dataset.src, caption: el.dataset.caption}));
+    let galleryIndex = 0;
+    function openGallery(index) {{
+      galleryIndex = index;
+      const box = document.getElementById('gallery-lightbox');
+      box.classList.add('open');
+      box.setAttribute('aria-hidden','false');
+      document.body.style.overflow='hidden';
+      showGalleryPhoto();
+    }}
+    function closeGallery() {{
+      const box = document.getElementById('gallery-lightbox');
+      box.classList.remove('open');
+      box.setAttribute('aria-hidden','true');
+      document.body.style.overflow='';
+    }}
+    function showGalleryPhoto() {{
+      if (!galleryPhotos.length) return;
+      const photo = galleryPhotos[galleryIndex];
+      document.getElementById('gallery-full-image').src = photo.src;
+      document.getElementById('gallery-full-image').alt = photo.caption || 'GDA Denmark gallery photo';
+      document.getElementById('gallery-caption').textContent = photo.caption || '';
+      document.querySelector('.gallery-counter').textContent = (galleryIndex + 1) + ' / ' + galleryPhotos.length;
+    }}
+    function galleryMove(step) {{
+      if (!galleryPhotos.length) return;
+      galleryIndex = (galleryIndex + step + galleryPhotos.length) % galleryPhotos.length;
+      showGalleryPhoto();
+    }}
+    document.addEventListener('keydown', function(e) {{
+      const box = document.getElementById('gallery-lightbox');
+      if (!box || !box.classList.contains('open')) return;
+      if (e.key === 'Escape') closeGallery();
+      if (e.key === 'ArrowLeft') galleryMove(-1);
+      if (e.key === 'ArrowRight') galleryMove(1);
+    }});
+    </script>'''
+    body=f'''<style>
+      .gallery-card{{overflow:hidden}}
+      .gallery-thumb{{display:block;width:100%;padding:0;border:0;background:transparent;cursor:zoom-in}}
+      .gallery-thumb img{{display:block;width:100%;height:240px;object-fit:cover;border-radius:12px;transition:transform .22s ease,opacity .22s ease}}
+      .gallery-thumb:hover img{{transform:scale(1.025);opacity:.94}}
+      .gallery-lightbox{{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;padding:70px 70px 50px}}
+      .gallery-lightbox.open{{display:flex}}
+      .gallery-view{{max-width:min(1100px,88vw);max-height:88vh;text-align:center;position:relative}}
+      .gallery-view img{{display:block;max-width:88vw;max-height:78vh;width:auto;height:auto;object-fit:contain;border-radius:8px;box-shadow:0 20px 70px rgba(0,0,0,.45)}}
+      .gallery-close,.gallery-prev,.gallery-next{{position:fixed;z-index:10001;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.25);font-size:34px;line-height:1;display:grid;place-items:center;padding:0}}
+      .gallery-close{{right:20px;top:18px}}
+      .gallery-prev{{left:18px;top:50%;transform:translateY(-50%)}}
+      .gallery-next{{right:18px;top:50%;transform:translateY(-50%)}}
+      .gallery-close:hover,.gallery-prev:hover,.gallery-next:hover{{background:rgba(255,255,255,.28)}}
+      .gallery-caption{{color:#fff}}
+      #gallery-caption{{color:#fff;margin-top:12px;font-weight:650}}
+      .gallery-counter{{color:#cbd5e1;margin-top:5px;font-size:13px}}
+      .gallery-hidden-item{{display:none!important}}
+      @media(max-width:650px){{
+        .gallery-lightbox{{padding:55px 48px 35px}}
+        .gallery-view img{{max-width:82vw;max-height:78vh}}
+        .gallery-prev{{left:8px}}
+        .gallery-next{{right:8px}}
+        .gallery-close{{right:10px;top:10px}}
+      }}
+    </style>
+    <div class="wrap"><div class="section-head"><div><h2>Gallery</h2><p>Photos and memories from Greater Dhaka Association, Denmark.</p></div></div><div class="cards">{cards}</div></div>
+    {gallery_data}
+    {overlay}'''
+    return page('Gallery',body, description='Gallery of Greater Dhaka Association, Denmark activities and community events.')
 
 @app.route('/gallery/image/<int:item_id>')
 def gallery_image(item_id):
