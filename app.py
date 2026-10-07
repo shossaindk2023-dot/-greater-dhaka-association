@@ -425,7 +425,7 @@ def gallery():
       <button class="gallery-next" type="button" onclick="galleryMove(1)" aria-label="Next photo">›</button>
     </div>
     <script>
-    const galleryPhotos = Array.from(document.querySelectorAll('.gallery-hidden-item')).map(el => ({src: el.dataset.src, caption: el.dataset.caption}));
+    const galleryPhotos = Array.from(document.querySelectorAll('.gallery-hidden-item')).map(el => ({{src: el.dataset.src, caption: el.dataset.caption}}));
     let galleryIndex = 0;
     function openGallery(index) {{
       galleryIndex = index;
