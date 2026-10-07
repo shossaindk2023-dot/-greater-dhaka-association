@@ -490,7 +490,7 @@ def admin_dashboard():
     rows=''.join(f'<tr><td>{html.escape(m.name)}</td><td>{html.escape(m.application_code)}</td><td>{html.escape(m.status)}</td><td>{html.escape(m.fee_status)}</td><td>{("<a href=/admin/application/"+str(m.id)+">Review Application</a>") if m.status=="Pending" else ("<a href=/admin/application/"+str(m.id)+">View</a>")}</td></tr>' for m in members)
     admin=current_admin()
     user_link = '<a href="/admin/users">Admin Users</a> · ' if admin and admin.role == 'superadmin' else ''
-    links = user_link + '<a href="/admin/manage">Member Management</a> · <a href="/approved-members">Approved Members</a> · <a href="/admin/gallery">Gallery</a> · <a href="/admin/change-password">Change Password</a> · <a href="/admin/settings">Website Settings</a> · <a href="/admin/news">News</a> · <a href="/admin/committee">Committee</a> · <a href="/admin/messages">Messages</a> · <a href="/admin/logout">Logout</a>'
+    links = user_link + '<a href="/admin/manage">Member Management</a> · <a href="/approved-members">Approved Members</a> · <a href="/admin/gallery">Gallery</a> · <a href="/admin/change-password">Change Password</a> · <a href="/admin/settings">Website Settings</a> · <a href="/admin/membership-payment">Membership &amp; Payment</a> · <a href="/admin/news">News</a> · <a href="/admin/committee">Committee</a> · <a href="/admin/messages">Messages</a> · <a href="/admin/logout">Logout</a>'
     body = '<div class="wrap"><p>' + links + '</p></div><div class="card"><h2>Members</h2><table><tr><th>Name</th><th>Application</th><th>Status</th><th>Fee</th><th>Action</th></tr>' + rows + '</table></div></div>'
     return page('Admin Dashboard', body)
 
