@@ -242,7 +242,7 @@ footer{background:var(--navy2);color:#d8e4f0;margin-top:0}
 <div class="brand-text"><div class="brand-title">Greater Dhaka Association</div><div class="brand-sub">Denmark</div><div class="brand-motto">সম্প্রীতি · সংস্কৃতি · কল্যাণ</div></div>
 </a>
 <nav>
-<a href="/">Home</a><a href="/about">About</a><a href="/committee">Committee</a><a href="/constitution">Constitution</a><a href="/news">News &amp; Events</a><a href="/gallery">Gallery</a><a href="/membership-fee">Membership Fee</a><a href="/register">Join Us</a><a href="/contact">Contact</a>
+<a href="/">Home</a><a href="/about">About</a><a href="/committee">Committee</a><a href="/constitution">Constitution</a><a href="/news">News &amp; Events</a><a href="/gallery">Gallery</a><a href="/membership-fee">Membership Fee</a><a href="/register">Join Us</a><a href="/status">Application Status</a><a href="/contact">Contact</a>
 </nav>
 </div></header>
 ''' + body + '''
@@ -283,7 +283,7 @@ def home():
     return page('Home',f'''<section class="hero"><div class="hero-inner"><div class="eyebrow">WELCOME TO OUR COMMUNITY</div><h1>Greater Dhaka Association, Denmark</h1><div class="motto">সম্প্রীতি · সংস্কৃতি · কল্যাণ</div><p>Bringing together the people of Greater Dhaka, preserving our culture, supporting our community and building a stronger future in Denmark.</p><div class="actions"><a class="btn" href="/register">Join Our Association&nbsp; →</a><a class="btn alt" href="/about">Learn More</a></div></div></section>
 <section class="quick"><div class="quick-grid"><div class="quick-item"><div class="quick-icon">👥</div><h3>Our Community</h3><p>United by our roots, stronger together.</p></div><div class="quick-item"><div class="quick-icon">🌿</div><h3>Culture &amp; Heritage</h3><p>Preserving our culture and identity.</p></div><div class="quick-item"><div class="quick-icon">🤝</div><h3>Support &amp; Welfare</h3><p>Helping each other and our community.</p></div><div class="quick-item"><div class="quick-icon">📅</div><h3>Events &amp; Activities</h3><p>Stay connected with our activities.</p></div></div></section>
 <div class="wrap"><div class="section-head"><div><h2>What We Stand For</h2><p>Our work is guided by community, culture and welfare.</p></div></div><div class="cards"><div class="card feature"><h3>Community</h3><p>Connecting people from Greater Dhaka and creating a welcoming community in Denmark.</p></div><div class="card feature"><h3>Culture &amp; Heritage</h3><p>Celebrating Bangladeshi language, traditions, history and the heritage of Greater Dhaka.</p></div><div class="card feature"><h3>Welfare</h3><p>Supporting members and families through mutual assistance, information and community initiatives.</p></div></div></div>
-<div class="wrap" style="padding-top:0"><div class="news-grid"><div class="card"><div class="section-head"><div><h2 style="font-size:26px">Latest News</h2><p>Updates from the association.</p></div><a href="/news">View all →</a></div>{news_html}</div><div class="card"><div class="section-head"><div><h2 style="font-size:26px">Get Involved</h2><p>Be part of our growing community.</p></div></div><p>Become a member, take part in cultural activities and help build a supportive community for everyone.</p><p><a class="btn" href="/register">Become a Member</a></p><p><a href="/membership-fee">View membership fee information →</a></p></div></div></div>
+<div class="wrap" style="padding-top:0"><div class="news-grid"><div class="card"><div class="section-head"><div><h2 style="font-size:26px">Latest News</h2><p>Updates from the association.</p></div><a href="/news">View all →</a></div>{news_html}</div><div class="card"><div class="section-head"><div><h2 style="font-size:26px">Get Involved</h2><p>Be part of our growing community.</p></div></div><p>Become a member, take part in cultural activities and help build a supportive community for everyone.</p><p><a class="btn" href="/register">Become a Member</a></p><p><a class="btn alt" href="/status">🔎 Check Application Status</a></p><p><a href="/membership-fee">View membership fee information →</a></p></div></div></div>
 <section class="cta"><div class="cta-inner"><div><h2>Together, we can build a stronger community.</h2><p>Connecting cultures, supporting lives and keeping our roots alive in Denmark.</p></div><a class="btn" href="/contact">Contact Us →</a></div></section>''', description='Greater Dhaka Association, Denmark (GDA Denmark) — connecting the Greater Dhaka community through harmony, culture and welfare.')
 
 @app.route('/about')
@@ -372,10 +372,16 @@ def register():
 
 @app.route('/status')
 def status():
-    code=request.args.get('code','').strip()
+    code=request.args.get('code','').strip().upper()
     result=Member.query.filter_by(application_code=code).first() if code else None
-    found=f'<div class="card"><h2>{result.name}</h2><p>Status: <b>{result.status}</b></p><p>Fee: <b>{result.fee_status}</b></p><p>Application reference: {result.application_code}</p></div>' if result else ''
-    return page('Application Status',f'''<div class="wrap"><div class="card"><h1>Application Status</h1><form><input name="code" placeholder="GDA-XXXXXXXXXXXX" value="{code}" required><button>Check Status</button></form></div>{found}</div>''', description='Check the status of a Greater Dhaka Association, Denmark membership application.')
+    if result:
+        status_label = 'Pending — your application is waiting for review.' if result.status == 'Pending' else ('Approved — your membership has been approved.' if result.status == 'Approved' else result.status)
+        found=f'<div class="card"><h2>{html.escape(result.name)}</h2><p>Status: <b>{html.escape(status_label)}</b></p><p>Fee: <b>{html.escape(result.fee_status)}</b></p><p>Application reference: <b>{html.escape(result.application_code)}</b></p></div>'
+    elif code:
+        found='<div class="card"><p class="danger"><b>Application not found.</b></p><p>Please check your application reference and try again.</p></div>'
+    else:
+        found='<div class="card"><p class="muted">Enter the application reference you received after submitting your membership application.</p></div>'
+    return page('Application Status',f'''<div class="wrap"><div class="card"><h1>🔎 Application Status</h1><p class="muted">Check whether your membership application is pending or approved.</p><form><label>Application Reference</label><input name="code" placeholder="GDA-XXXXXXXXXXXX" value="{html.escape(code, quote=True)}" required><button>Check Status</button></form></div>{found}</div>''', description='Check the status of a Greater Dhaka Association, Denmark membership application.')
 
 @app.route('/verify/<membership_number>')
 def verify(membership_number):
